@@ -346,49 +346,6 @@ function bindFieldEvents(){
   document.querySelectorAll(".att-remove").forEach(el => el.onclick = () => { attachments.splice(Number(el.dataset.i),1); renderAttachments(); });
 }
 
-$("activityForm").onsubmit = async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const data = cleanUndefined({
-    title: val("title").trim(),
-    date: val("date"),
-    time: val("time").trim(),
-    location: val("location").trim(),
-    description: val("description").trim(),
-    capacity: Number(val("capacity") || 0),
-    status: val("status") || "open",
-    published: checked("published"),
-    feedbackOpenAt: val("feedbackOpenAt"),
-    attachments: attachments.filter(a => (a.name || a.url)),
-    registerFields: regFields,
-    feedbackQuestions: fbQuestions.filter(Boolean),
-    feedbackMinWords: Number(val("feedbackMinWords") || 30),
-    updatedAt: serverTimestamp()
-  });
-
-  if(!data.title || !data.date) return alert("活動名稱和日期必填");
-
-  try{
-    const id = val("editId");
-    if(id){
-      await updateDoc(doc(db, "activities", id), data);
-    }else{
-      data.registeredCount = 0;
-      data.feedbackCount = 0;
-      data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "activities"), data);
-    }
-    alert("已儲存");
-    resetForm();
-    showView("activities");
-    showView("activities");
-  }catch(err){
-    console.error(err);
-    alert("儲存失敗：" + err.message);
-  }
-};
-
 async function deleteActivity(id){
   if(!confirm("確定刪除此活動？")) return;
   await deleteDoc(doc(db, "activities", id));
@@ -488,4 +445,69 @@ if(newActivityBtnBackup){
     showView("activities");
     resetForm();
   });
+}
+
+
+// v1.1.4.6 robust save fallback
+async function saveActivityFallback(event){
+  event.preventDefault();
+  event.stopPropagation();
+
+  const get = (id) => document.getElementById(id);
+  const readVal = (id) => get(id)?.value ?? "";
+  const readChecked = (id) => !!get(id)?.checked;
+
+  const payload = cleanUndefined({
+    title: readVal("title").trim(),
+    date: readVal("date"),
+    time: readVal("time").trim(),
+    location: readVal("location").trim(),
+    description: readVal("description").trim(),
+    capacity: Number(readVal("capacity") || 0),
+    status: readVal("status") || "open",
+    published: readChecked("published"),
+    feedbackOpenAt: readVal("feedbackOpenAt"),
+    attachments: (typeof attachments !== "undefined" ? attachments : []).filter(a => (a.name || a.url)),
+    registerFields: (typeof regFields !== "undefined" ? regFields : []),
+    feedbackQuestions: (typeof fbQuestions !== "undefined" ? fbQuestions : []).filter(Boolean),
+    feedbackMinWords: Number(readVal("feedbackMinWords") || 30),
+    updatedAt: serverTimestamp()
+  });
+
+  if(!payload.title || !payload.date){
+    alert("活動名稱和日期必填");
+    return;
+  }
+
+  try{
+    const editIdValue = readVal("editId");
+    if(editIdValue){
+      await updateDoc(doc(db, "activities", editIdValue), payload);
+    }else{
+      payload.registeredCount = 0;
+      payload.feedbackCount = 0;
+      payload.createdAt = serverTimestamp();
+      await addDoc(collection(db, "activities"), payload);
+    }
+    alert("已儲存");
+    resetForm();
+    showView("activities");
+  }catch(err){
+    console.error(err);
+    alert("儲存失敗：" + err.message);
+  }
+}
+
+const activityFormFallback = document.getElementById("activityForm");
+if(activityFormFallback){
+  activityFormFallback.addEventListener("submit", saveActivityFallback, true);
+}
+
+const newActivityBtnFallbackV1146 = document.getElementById("newActivityBtn");
+if(newActivityBtnFallbackV1146){
+  newActivityBtnFallbackV1146.addEventListener("click", (e) => {
+    e.preventDefault();
+    showView("activities");
+    resetForm();
+  }, true);
 }
