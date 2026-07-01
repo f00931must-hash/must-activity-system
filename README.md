@@ -1,4 +1,4 @@
-# MUST Activity System v1.0.1
+# MUST Activity System v1.0.2
 
 活動報名與回饋管理平台。
 
@@ -22,3 +22,6 @@
 ## v1.0.1 修正
 - 修正 GitHub Pages 路徑 404。
 - 新增 frontend/shared/js 相容轉接檔。
+
+## v1.0.2 修正
+- 修正 Firebase 官方 apiKey 與 appId。
