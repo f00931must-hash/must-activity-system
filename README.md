@@ -1,4 +1,4 @@
-# MUST Activity System v1.0
+# MUST Activity System v1.0.1
 
 活動報名與回饋管理平台。
 
@@ -18,3 +18,7 @@
 1. 解壓縮後整包上傳 GitHub。
 2. GitHub Pages 設定 main / root。
 3. Firebase Firestore Rules 貼上 `firebase/firestore.rules`。
+
+## v1.0.1 修正
+- 修正 GitHub Pages 路徑 404。
+- 新增 frontend/shared/js 相容轉接檔。
