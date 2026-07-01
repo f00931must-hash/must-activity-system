@@ -7,15 +7,6 @@ import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, getDocs,
 const $ = (id) => document.getElementById(id);
 const provider = new GoogleAuthProvider();
 
-const loginBtnSafe = $("loginBtn");
-if(loginBtnSafe){
-  loginBtnSafe.addEventListener("click", async () => {
-    try { await signInWithPopup(auth, provider); }
-    catch(e){ alert("登入失敗：" + e.message); console.error(e); }
-  });
-}
-
-
 let activities = [];
 let adminEmails = [];
 let currentUser = null;
@@ -41,7 +32,10 @@ function setChecked(id, value){ const el = $(id); if(el) el.checked = !!value; }
 function setText(id, value){ const el = $(id); if(el) el.textContent = value ?? ""; }
 function setHtml(id, value){ const el = $(id); if(el) el.innerHTML = value ?? ""; }
 
-
+$("loginBtn").onclick = async () => {
+  try { await signInWithPopup(auth, provider); }
+  catch(e){ alert("登入失敗：" + e.message); }
+};
 
 $("logoutBtn").onclick = () => signOut(auth);
 
@@ -165,7 +159,7 @@ function showView(view){
   setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",settings:"系統設定"}[view] || "管理平台");
 }
 
- resetForm(); };
+$("newActivityBtn").onclick = () => { showView("activities"); resetForm(); };
 $("resetBtn").onclick = resetForm;
 $("addRegisterFieldBtn").onclick = () => {
   regFields.push({ label:"新題目", type:"text", required:false, options:[] });
@@ -488,9 +482,9 @@ function round(n){ return Math.round(n*10)/10; }
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
 function esc(str){ return String(str || "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 
-const newActivityBtnSafe = $("newActivityBtn");
-if(newActivityBtnSafe){
-  newActivityBtnSafe.addEventListener("click", () => {
+const newActivityBtnBackup = $("newActivityBtn");
+if(newActivityBtnBackup){
+  newActivityBtnBackup.addEventListener("click", () => {
     showView("activities");
     resetForm();
   });
