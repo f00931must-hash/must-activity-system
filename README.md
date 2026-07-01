@@ -1,1 +1,20 @@
-# must-activity-form
+# MUST Activity System v1.0
+
+活動報名與回饋管理平台。
+
+## 功能
+- 學生端活動列表、報名表、回饋表
+- 老師端 Google 登入後台
+- 新增/修改/刪除活動
+- 基本報名欄位：姓名、系級、學號、電話、餐點
+- 自訂報名欄位
+- 自訂回饋滿意度題目
+- 心得最低字數限制
+- 報名/回饋連結與 QR Code
+- 報名 CSV、回饋 CSV、成果 Word 匯出
+- 多老師 Email 管理
+
+## 上線
+1. 解壓縮後整包上傳 GitHub。
+2. GitHub Pages 設定 main / root。
+3. Firebase Firestore Rules 貼上 `firebase/firestore.rules`。
