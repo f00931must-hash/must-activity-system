@@ -7,6 +7,15 @@ import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, getDocs,
 const $ = (id) => document.getElementById(id);
 const provider = new GoogleAuthProvider();
 
+const loginBtnSafe = $("loginBtn");
+if(loginBtnSafe){
+  loginBtnSafe.addEventListener("click", async () => {
+    try { await signInWithPopup(auth, provider); }
+    catch(e){ alert("登入失敗：" + e.message); console.error(e); }
+  });
+}
+
+
 let activities = [];
 let adminEmails = [];
 let currentUser = null;
@@ -32,10 +41,7 @@ function setChecked(id, value){ const el = $(id); if(el) el.checked = !!value; }
 function setText(id, value){ const el = $(id); if(el) el.textContent = value ?? ""; }
 function setHtml(id, value){ const el = $(id); if(el) el.innerHTML = value ?? ""; }
 
-$("loginBtn").onclick = async () => {
-  try { await signInWithPopup(auth, provider); }
-  catch(e){ alert("登入失敗：" + e.message); }
-};
+
 
 $("logoutBtn").onclick = () => signOut(auth);
 
@@ -103,7 +109,9 @@ function closeModalSafe(){
   const modal = $("modal");
   if(modal) modal.classList.add("hidden");
 }
-
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape") closeModalSafe();
+});
 document.addEventListener("click", async (e) => {
   if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
     closeModalSafe();
@@ -381,7 +389,6 @@ $("activityForm").onsubmit = async (e) => {
     resetForm();
     showView("activities");
     showView("activities");
-    showView("activities");
   }catch(err){
     console.error(err);
     alert("儲存失敗：" + err.message);
@@ -480,12 +487,6 @@ function cleanUndefined(obj){
 function round(n){ return Math.round(n*10)/10; }
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
 function esc(str){ return String(str || "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
-
-// v1.1.4.1 safety binding
-document.getElementById("newActivityBtn")?.addEventListener("click", () => {
-  showView("activities");
-  resetForm();
-});
 
 const newActivityBtnSafe = $("newActivityBtn");
 if(newActivityBtnSafe){
