@@ -1,4 +1,4 @@
-# MUST Activity System v1.1.4.1
+# MUST Activity System v1.1.4.2
 
 活動報名與回饋管理平台。
 
@@ -69,3 +69,7 @@
 ## v1.1.4.1 修正
 - 以 v1.1.4 為基礎，只修新增/修改活動。
 - 不更動已正常的彈窗關閉功能。
+
+## v1.1.4.2 修正
+- 修正 closeModalBtn.onclick null 錯誤造成後台中斷。
+- 修正新增活動/修改活動按鈕無反應。

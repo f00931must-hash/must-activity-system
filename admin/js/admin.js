@@ -98,7 +98,18 @@ function renderAdmins(){
   `).join("");
 }
 
+
+function closeModalSafe(){
+  const modal = $("modal");
+  if(modal) modal.classList.add("hidden");
+}
+
 document.addEventListener("click", async (e) => {
+  if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
+    closeModalSafe();
+    return;
+  }
+
   if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
     const modal = $("modal");
     if(modal) modal.classList.add("hidden");
@@ -146,7 +157,7 @@ function showView(view){
   setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",settings:"系統設定"}[view] || "管理平台");
 }
 
-$("newActivityBtn").onclick = () => { showView("activities"); resetForm(); };
+ resetForm(); };
 $("resetBtn").onclick = resetForm;
 $("addRegisterFieldBtn").onclick = () => {
   regFields.push({ label:"新題目", type:"text", required:false, options:[] });
@@ -161,7 +172,6 @@ $("addAttachmentBtn").onclick = () => {
   renderAttachments();
 };
 function closeModal(){ $("modal")?.classList.add("hidden"); }
-const closeModalBtn = $("closeModalBtn");
 $("modal")?.addEventListener("click", (e) => { if(e.target.id === "modal") closeModal(); });
 document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 $("adminSearch").oninput = (e) => {
@@ -371,6 +381,7 @@ $("activityForm").onsubmit = async (e) => {
     resetForm();
     showView("activities");
     showView("activities");
+    showView("activities");
   }catch(err){
     console.error(err);
     alert("儲存失敗：" + err.message);
@@ -475,3 +486,11 @@ document.getElementById("newActivityBtn")?.addEventListener("click", () => {
   showView("activities");
   resetForm();
 });
+
+const newActivityBtnSafe = $("newActivityBtn");
+if(newActivityBtnSafe){
+  newActivityBtnSafe.addEventListener("click", () => {
+    showView("activities");
+    resetForm();
+  });
+}
