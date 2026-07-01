@@ -1,4 +1,4 @@
-# MUST Activity System v1.1.4
+# MUST Activity System v1.1.5
 
 活動報名與回饋管理平台。
 
@@ -65,3 +65,7 @@
 ## v1.1.4 修正
 - 修正報名名單彈窗關閉失效。
 - 修正儲存後跳回儀表板。
+
+## v1.1.5 修正
+- 修正 closeModalBtn 找不到造成整個後台 JS 中斷。
+- 修正新增活動按鈕失效。

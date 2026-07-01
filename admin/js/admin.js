@@ -98,12 +98,30 @@ function renderAdmins(){
   `).join("");
 }
 
+
+function closeMasModal(){
+  const modal = $("modal");
+  if(modal) modal.classList.add("hidden");
+}
+
+document.addEventListener("keydown", (e) => {
+  if(e.key === "Escape") closeMasModal();
+});
+
 document.addEventListener("click", async (e) => {
+  if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
+    closeMasModal();
+    return;
+  }
+
   if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
     const modal = $("modal");
     if(modal) modal.classList.add("hidden");
     return;
   }
+  const newBtn = e.target.closest("#newActivityBtn");
+  if(newBtn){ showView("activities"); resetForm(); return; }
+
   const nav = e.target.closest(".nav-item");
   if(nav) return showView(nav.dataset.view);
 
@@ -146,7 +164,7 @@ function showView(view){
   setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",settings:"系統設定"}[view] || "管理平台");
 }
 
-$("newActivityBtn").onclick = () => { showView("activities"); resetForm(); };
+ resetForm(); };
 $("resetBtn").onclick = resetForm;
 $("addRegisterFieldBtn").onclick = () => {
   regFields.push({ label:"新題目", type:"text", required:false, options:[] });
@@ -161,7 +179,6 @@ $("addAttachmentBtn").onclick = () => {
   renderAttachments();
 };
 function closeModal(){ $("modal")?.classList.add("hidden"); }
-const closeModalBtn = $("closeModalBtn");
 $("modal")?.addEventListener("click", (e) => { if(e.target.id === "modal") closeModal(); });
 document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 $("adminSearch").oninput = (e) => {
