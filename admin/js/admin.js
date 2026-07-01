@@ -155,8 +155,11 @@ $("addAttachmentBtn").onclick = () => {
   attachments.push({name:"附件", url:""});
   renderAttachments();
 };
+function closeModal(){ $("modal")?.classList.add("hidden"); }
 const closeModalBtn = $("closeModalBtn");
-if(closeModalBtn) closeModalBtn.onclick = () => $("modal")?.classList.add("hidden");
+if(closeModalBtn) closeModalBtn.onclick = closeModal;
+$("modal")?.addEventListener("click", (e) => { if(e.target.id === "modal") closeModal(); });
+document.addEventListener("keydown", (e) => { if(e.key === "Escape") closeModal(); });
 $("adminSearch").oninput = (e) => {
   adminSearchText = e.target.value.trim();
   renderLists();
@@ -187,24 +190,40 @@ function renderLists(){
 function card(a){
   const regUrl = siteConfig.baseUrl + "frontend/activity.html?id=" + a.id;
   const fbUrl = siteConfig.baseUrl + "frontend/feedback.html?id=" + a.id;
-  return `<article class="admin-card">
-    <div>
-      <div class="admin-card-title">${esc(a.title)} <span class="badge">${statusText(a.status)}</span></div>
-      <div class="admin-card-meta">📅 ${esc(a.date||"")} ${esc(a.time||"")}｜📍${esc(a.location||"")}｜報名 ${a.registeredCount||0}/${a.capacity||"不限"}｜回饋 ${a.feedbackCount||0}</div>
+  const capText = Number(a.capacity || 0) > 0 ? `${a.registeredCount||0}/${a.capacity}` : `${a.registeredCount||0}/不限`;
+  const fbOpen = a.feedbackOpenAt ? `｜回饋開放：${formatDateTime(a.feedbackOpenAt)}` : "";
+  return `<article class="activity-admin-card">
+    <div class="activity-card-main">
+      <div class="activity-title-row">
+        <h3>${esc(a.title)}</h3>
+        <span class="badge">${statusText(a.status)}</span>
+      </div>
+      <div class="activity-info-grid">
+        <div><strong>日期</strong><span>📅 ${esc(a.date||"")}</span></div>
+        <div><strong>時間</strong><span>${esc(a.time||"")}</span></div>
+        <div><strong>地點</strong><span>📍 ${esc(a.location||"")}</span></div>
+        <div><strong>報名</strong><span>${capText}</span></div>
+        <div><strong>回饋</strong><span>${a.feedbackCount||0} 份${esc(fbOpen)}</span></div>
+      </div>
+      ${a.description ? `<p class="activity-desc">${esc(a.description)}</p>` : ""}
     </div>
-    <div class="admin-actions">
+    <div class="activity-actions">
       <button class="ghost-btn" data-copy="${regUrl}">複製報名連結</button>
       <button class="ghost-btn" data-qr="${regUrl}" data-name="${esc(a.title)}_報名QR">報名QR</button>
       <button class="ghost-btn" data-copy="${fbUrl}">複製回饋連結</button>
       <button class="ghost-btn" data-qr="${fbUrl}" data-name="${esc(a.title)}_回饋QR">回饋QR</button>
       <button class="ghost-btn" data-view-regs="${a.id}">查看報名名單</button>
-      <button class="ghost-btn" data-export-regs="${a.id}">下載報名名單</button>
       <button class="ghost-btn" data-export-fbs="${a.id}">下載回饋資料</button>
       <button class="ghost-btn" data-export-word="${a.id}">下載成果Word</button>
       <button class="ghost-btn" data-edit="${a.id}">修改</button>
-      <button class="ghost-btn" data-delete="${a.id}">刪除</button>
+      <button class="ghost-btn danger-btn" data-delete="${a.id}">刪除</button>
     </div>
   </article>`;
+}
+
+function formatDateTime(v){
+  if(!v) return "";
+  return String(v).replace("T"," ");
 }
 
 function resetForm(){
