@@ -1,4 +1,4 @@
-# MUST Activity System v1.0.3
+# MUST Activity System v1.0.4
 
 活動報名與回饋管理平台。
 
@@ -30,3 +30,7 @@
 - 修正後台儲存活動時 status 可能 undefined 的問題。
 - 修正 resetForm 的 search 命名衝突。
 - 回饋題目改為滿意度李克特五級：非常滿意、滿意、普通、不滿意、非常不滿意。
+
+## v1.0.4 修正
+- 修正後台使用瀏覽器全域變數 `status` 導致無法儲存活動。
+- 修正活動資料送出前清除 undefined 欄位。
