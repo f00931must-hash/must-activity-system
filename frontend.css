@@ -1,0 +1,55 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function email() {
+      return request.auth.token.email;
+    }
+
+    function isBuiltInAdmin() {
+      return signedIn() && email() in ["master004400@gmail.com"];
+    }
+
+    function isListedAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/settings/admins)
+        && email() in get(/databases/$(database)/documents/settings/admins).data.emails;
+    }
+
+    function isAdmin() {
+      return isBuiltInAdmin() || isListedAdmin();
+    }
+
+    match /activities/{activityId} {
+      allow read: if true;
+
+      // 老師管理活動；學生報名/回饋時只會更新人數
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || true;
+
+      match /registrations/{studentId} {
+        allow create: if true;
+        allow get: if true;
+        allow list, update, delete: if isAdmin();
+      }
+
+      match /feedbacks/{studentId} {
+        allow create: if true;
+        allow get: if true;
+        allow list, update, delete: if isAdmin();
+      }
+    }
+
+    match /settings/admins {
+      // 讓已登入老師可以讀取名單，才能判斷自己是否為管理者
+      allow read: if signedIn();
+      allow create, update: if isBuiltInAdmin() || isListedAdmin();
+      allow delete: if false;
+    }
+  }
+}
