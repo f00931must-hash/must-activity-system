@@ -434,7 +434,7 @@ async function exportFeedbackWord(id){
   const total = rows.length || 1;
   const week = weekdayText(a.date);
   const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(a.time || "")}`;
-  const headerLine1 = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期明新科技大學`;
+  const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期明新科技大學　學務處健康與諮商中心資源教室`;
   const tableRows = qs.map((q,i)=>{
     const cells = likertOptions.map(o=>{
       const count = rows.filter(r=>r.ratings?.[q]===o).length;
@@ -449,23 +449,25 @@ async function exportFeedbackWord(id){
   const comments = rows.map((r,i)=>r.comment ? `<p>(${i+1}) ${esc(r.comment||"")}</p>` : "").join("");
   const html = `<!doctype html><html><head><meta charset="utf-8">
   <style>
-    body{font-family:'DFKai-SB','標楷體','BiauKai',serif;font-size:12pt;line-height:1.6}
-    h1{font-size:22pt;text-align:center;margin:8px 0;font-family:'DFKai-SB','標楷體','BiauKai',serif}
-    h2{font-size:12pt;margin:16px 0 8px;font-family:'DFKai-SB','標楷體','BiauKai',serif}
-    .top{font-size:22pt;text-align:center;font-weight:bold;line-height:1.5}
-    .meta{font-size:12pt;margin:6px 0}
+    @page{size:A4;margin:1.27cm}
+    body{font-family:'DFKai-SB','標楷體','BiauKai',serif;font-size:12pt;line-height:1.45}
+    h1{font-size:24pt;text-align:center;margin:8px 0 10px;font-family:'DFKai-SB','標楷體','BiauKai',serif}
+    h2{font-size:12pt;margin:12px 0 6px;font-family:'DFKai-SB','標楷體','BiauKai',serif}
+    .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.4;white-space:nowrap}
+    .meta{font-size:12pt;margin:5px 0}
     table{border-collapse:collapse;width:100%;font-size:12pt}
-    td,th{border:1px solid #333;padding:6px;vertical-align:middle;font-size:12pt}
-    th{font-weight:bold}
+    td,th{border:1px solid #333;padding:5px;vertical-align:middle;font-size:12pt}
+    th{font-weight:bold;text-align:center}
     .item{text-align:justify;text-justify:inter-ideograph;width:48%}
+    .item-head{text-align:justify;text-align-last:justify;text-justify:inter-ideograph}
   </style></head><body>
-  <div class="top">${headerLine1}<br>學務處健康與諮商中心資源教室</div>
+  <div class="top">${headerLine}</div>
   <h1>「${esc(a.title)}」回饋表</h1>
   <p class="meta">${dateLine}</p>
   <p class="meta">主　　題：${esc(a.title)}</p>
   <p class="meta">活動地點：${esc(a.location||"")}</p>
   <h2>一、活動滿意度</h2>
-  <table><tr><th class="item">項目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table>
+  <table><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table>
   ${textBlocks}
   <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
   </body></html>`;
