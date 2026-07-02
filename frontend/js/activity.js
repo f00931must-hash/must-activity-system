@@ -33,6 +33,13 @@ function renderHeader(){
 function renderForm(){
   const cap = Number(activity.capacity || 0);
   const reg = Number(activity.registeredCount || 0);
+  const now = Date.now();
+  const openAt = parseLocalTime(activity.registerOpenAt);
+  const closeAt = parseLocalTime(activity.registerCloseAt);
+  if((openAt && now < openAt) || (closeAt && now > closeAt)){
+    $("registerPanel").innerHTML = '<div class="empty">目前未開放報名。</div>';
+    return;
+  }
 
   if(activity.status !== "open"){
     $("registerPanel").innerHTML = '<div class="empty">目前未開放報名。</div>';
@@ -109,6 +116,12 @@ async function submitForm(e){
     console.error(err);
     $("msg").innerHTML = `<div class="error">報名失敗：${esc(err.message)}</div>`;
   }
+}
+
+function parseLocalTime(value){
+  if(!value) return null;
+  const t = new Date(String(value)).getTime();
+  return Number.isNaN(t) ? null : t;
 }
 
 function attachmentHtml(files){

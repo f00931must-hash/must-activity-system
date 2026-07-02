@@ -90,3 +90,5 @@
 
 /* v1.1.4 */
 .modal-card{position:relative}.modal-close{position:absolute;right:18px;top:18px}
+
+h3 small{font-size:13px;color:var(--muted);font-weight:400}
