@@ -12,6 +12,7 @@ let adminEmails = [];
 let currentUser = null;
 let regFields = [];
 let fbQuestions = [];
+let feedbackTextQuestions = [];
 let attachments = [];
 let adminSearchText = "";
 let unsubscribe = null;
@@ -124,7 +125,6 @@ function card(a){
       <button class="ghost-btn" data-qrprint="${fbUrl}" data-title="${esc(a.title)} 回饋 QR">下載回饋QR A4</button>
       <button class="ghost-btn" data-view-regs="${a.id}">查看報名名單</button>
       <button class="ghost-btn" data-view-fbs="${a.id}">查看回饋資料</button>
-      <button class="ghost-btn" data-export-fbs="${a.id}">下載回饋資料</button>
       <button class="ghost-btn" data-export-word="${a.id}">下載成果Word</button>
       <button class="ghost-btn" data-copy-activity="${a.id}">複製活動</button>
       <button class="ghost-btn" data-edit="${a.id}">修改</button>
@@ -154,10 +154,12 @@ function resetForm(){
   setVal("feedbackMinWords", 30);
   regFields = [];
   fbQuestions = [...defaultFb];
+  feedbackTextQuestions = [];
   attachments = [];
   renderAttachments();
   renderRegFields();
   renderFbQuestions();
+  renderFeedbackTextQuestions();
 }
 
 function editActivity(id){
@@ -183,10 +185,12 @@ function editActivity(id){
   setVal("feedbackMinWords", a.feedbackMinWords || 30);
   regFields = a.registerFields || [];
   fbQuestions = a.feedbackQuestions || [...defaultFb];
+  feedbackTextQuestions = a.feedbackTextQuestions || [];
   attachments = a.attachments || [];
   renderAttachments();
   renderRegFields();
   renderFbQuestions();
+  renderFeedbackTextQuestions();
 }
 
 function copyActivity(id){
@@ -212,8 +216,9 @@ function copyActivity(id){
   setVal("feedbackMinWords", a.feedbackMinWords || 30);
   regFields = JSON.parse(JSON.stringify(a.registerFields || []));
   fbQuestions = [...(a.feedbackQuestions || [])];
+  feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
   attachments = JSON.parse(JSON.stringify(a.attachments || []));
-  renderAttachments(); renderRegFields(); renderFbQuestions();
+  renderAttachments(); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
 }
 
 function renderAttachments(){
@@ -261,6 +266,24 @@ function renderFbQuestions(){
   bindFieldEvents();
 }
 
+
+function renderFeedbackTextQuestions(){
+  const html = feedbackTextQuestions.length ? feedbackTextQuestions.map((q,i)=>`
+    <div class="field-item">
+      <div class="field-row">
+        <input class="field fb-text-question" data-i="${i}" value="${esc(q.label || "")}" placeholder="例如：你對本次活動最大的收穫是什麼？">
+        <select class="field fb-text-type" data-i="${i}">
+          <option value="textarea" ${q.type==="textarea"?"selected":""}>段落</option>
+          <option value="text" ${q.type==="text"?"selected":""}>簡答</option>
+        </select>
+        <button type="button" class="ghost-btn fb-text-remove" data-i="${i}">移除</button>
+      </div>
+      <label><input type="checkbox" class="fb-text-required" data-i="${i}" ${q.required ? "checked" : ""}> 必填</label>
+    </div>`).join("") : '<div class="empty">目前沒有回饋簡答題目。</div>';
+  setHtml("feedbackTextQuestionsBox", html);
+  bindFieldEvents();
+}
+
 function bindFieldEvents(){
   document.querySelectorAll(".reg-label").forEach(el => el.oninput = () => regFields[Number(el.dataset.i)].label = el.value);
   document.querySelectorAll(".reg-type").forEach(el => el.onchange = () => regFields[Number(el.dataset.i)].type = el.value);
@@ -272,6 +295,10 @@ function bindFieldEvents(){
   document.querySelectorAll(".att-name").forEach(el => el.oninput = () => attachments[Number(el.dataset.i)].name = el.value);
   document.querySelectorAll(".att-url").forEach(el => el.oninput = () => attachments[Number(el.dataset.i)].url = el.value);
   document.querySelectorAll(".att-remove").forEach(el => el.onclick = () => { attachments.splice(Number(el.dataset.i),1); renderAttachments(); });
+  document.querySelectorAll(".fb-text-question").forEach(el => el.oninput = () => feedbackTextQuestions[Number(el.dataset.i)].label = el.value);
+  document.querySelectorAll(".fb-text-type").forEach(el => el.onchange = () => feedbackTextQuestions[Number(el.dataset.i)].type = el.value);
+  document.querySelectorAll(".fb-text-required").forEach(el => el.onchange = () => feedbackTextQuestions[Number(el.dataset.i)].required = el.checked);
+  document.querySelectorAll(".fb-text-remove").forEach(el => el.onclick = () => { feedbackTextQuestions.splice(Number(el.dataset.i),1); renderFeedbackTextQuestions(); });
 }
 
 async function saveActivity(event){
@@ -296,6 +323,7 @@ async function saveActivity(event){
     attachments: attachments.filter(a => (a.name || a.url)),
     registerFields: regFields,
     feedbackQuestions: fbQuestions.filter(Boolean),
+    feedbackTextQuestions: feedbackTextQuestions.filter(q => q.label),
     feedbackMinWords: Number(val("feedbackMinWords") || 30),
     updatedAt: serverTimestamp()
   });
@@ -371,8 +399,9 @@ async function viewFeedbacks(id){
   const snap = await getDocs(collection(db, "activities", id, "feedbacks"));
   const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
   const qs = a.feedbackQuestions || [];
-  const table = rows.length ? `<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}<th>心得</th><th>操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}<td>${esc(r.comment||"")}</td><td><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有人填寫回饋</div>';
-  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜回饋資料 <span class="quick-count">${rows.length} 份</span></h2>${table}`);
+  const textQs = a.feedbackTextQuestions || [];
+  const table = rows.length ? `<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}${textQs.map(q=>`<th>${esc(q.label)}</th>`).join("")}<th>心得</th><th>操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}${textQs.map(q=>`<td>${esc(r.textAnswers?.[q.label]||"")}</td>`).join("")}<td>${esc(r.comment||"")}</td><td><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有人填寫回饋</div>';
+  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜回饋資料 <span class="quick-count">${rows.length} 份</span></h2>${table}<p><button class="primary-btn" data-export-fbs="${id}">下載回饋資料</button></p>`);
   $("modal")?.classList.remove("hidden");
 }
 async function deleteRegistration(activityId, studentId){
@@ -390,8 +419,9 @@ async function exportFeedbacks(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "feedbacks"));
   const rows = snap.docs.map(d=>d.data());
-  const headers = ["姓名","學號",...(a.feedbackQuestions||[]),"心得"];
-  const data = rows.map(r => [r.name,r.studentId,...(a.feedbackQuestions||[]).map(q=>r.ratings?.[q]||""),r.comment]);
+  const textQs = a.feedbackTextQuestions || [];
+  const headers = ["姓名","學號",...(a.feedbackQuestions||[]),...textQs.map(q=>q.label),"心得"];
+  const data = rows.map(r => [r.name,r.studentId,...(a.feedbackQuestions||[]).map(q=>r.ratings?.[q]||""),...textQs.map(q=>r.textAnswers?.[q.label]||""),r.comment]);
   downloadCsv(a.title+"_回饋資料.csv", [headers,...data]);
 }
 
@@ -400,16 +430,45 @@ async function exportFeedbackWord(id){
   const snap = await getDocs(collection(db, "activities", id, "feedbacks"));
   const rows = snap.docs.map(d=>d.data());
   const qs = a.feedbackQuestions || [];
+  const textQs = a.feedbackTextQuestions || [];
   const total = rows.length || 1;
-  let tableRows = qs.map((q,i)=>{
+  const week = weekdayText(a.date);
+  const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(a.time || "")}`;
+  const headerLine1 = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期明新科技大學`;
+  const tableRows = qs.map((q,i)=>{
     const cells = likertOptions.map(o=>{
       const count = rows.filter(r=>r.ratings?.[q]===o).length;
       return `<td>${round(count/total*100)}%</td>`;
     }).join("");
-    return `<tr><td>${i+1}. ${esc(q)}</td>${cells}</tr>`;
+    return `<tr><td class="item">${i+1}. ${esc(q)}</td>${cells}</tr>`;
   }).join("");
-  const comments = rows.map((r,i)=>`<p>${i+1}. ${esc(r.comment||"")}</p>`).join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:'Microsoft JhengHei';font-size:14pt;line-height:1.8}table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:8px}h1,h2{text-align:center}</style></head><body><h2>${esc(a.academicYear&&a.semester?`${a.academicYear} 學年度第 ${a.semester} 學期明新科技大學 學務處健康與諮商中心資源教室`:"明新科技大學 學務處健康與諮商中心資源教室")}</h2><h1>「${esc(a.title)}」回饋表</h1><p>時間：${esc(a.date)} ${esc(a.time||"")}</p><p>地點：${esc(a.location||"")}</p><h2 style="text-align:left">一、活動滿意度</h2><table><tr><th>題目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table><h2 style="text-align:left">二、參與活動後，我的心得與感想</h2>${comments}</body></html>`;
+  const textBlocks = textQs.map((q, qi)=>{
+    const answers = rows.map((r,i)=>r.textAnswers?.[q.label] ? `<p>(${i+1}) ${esc(r.textAnswers[q.label])}</p>` : "").join("");
+    return `<h2>${qs.length + qi + 1}. ${esc(q.label)}</h2>${answers || "<p>無填答資料</p>"}`;
+  }).join("");
+  const comments = rows.map((r,i)=>r.comment ? `<p>(${i+1}) ${esc(r.comment||"")}</p>` : "").join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+  <style>
+    body{font-family:'DFKai-SB','標楷體','BiauKai',serif;font-size:12pt;line-height:1.6}
+    h1{font-size:22pt;text-align:center;margin:8px 0;font-family:'DFKai-SB','標楷體','BiauKai',serif}
+    h2{font-size:12pt;margin:16px 0 8px;font-family:'DFKai-SB','標楷體','BiauKai',serif}
+    .top{font-size:22pt;text-align:center;font-weight:bold;line-height:1.5}
+    .meta{font-size:12pt;margin:6px 0}
+    table{border-collapse:collapse;width:100%;font-size:12pt}
+    td,th{border:1px solid #333;padding:6px;vertical-align:middle;font-size:12pt}
+    th{font-weight:bold}
+    .item{text-align:justify;text-justify:inter-ideograph;width:48%}
+  </style></head><body>
+  <div class="top">${headerLine1}<br>學務處健康與諮商中心資源教室</div>
+  <h1>「${esc(a.title)}」回饋表</h1>
+  <p class="meta">${dateLine}</p>
+  <p class="meta">主　　題：${esc(a.title)}</p>
+  <p class="meta">活動地點：${esc(a.location||"")}</p>
+  <h2>一、活動滿意度</h2>
+  <table><tr><th class="item">項目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table>
+  ${textBlocks}
+  <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
+  </body></html>`;
   downloadFile(a.title+"_活動回饋表.doc", html, "application/msword");
 }
 
@@ -426,6 +485,13 @@ function downloadFile(filename, content, type){
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function weekdayText(dateStr){
+  if(!dateStr) return "";
+  const d = new Date(dateStr);
+  if(Number.isNaN(d.getTime())) return "";
+  return ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"][d.getDay()];
 }
 
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
@@ -449,6 +515,7 @@ bindClick("newActivityBtn", (e) => { e.preventDefault(); showView("activities");
 bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
+bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
 bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({name:"附件", url:""}); renderAttachments(); });
 
 const activityForm = $("activityForm");

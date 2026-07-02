@@ -92,3 +92,5 @@
 .modal-card{position:relative}.modal-close{position:absolute;right:18px;top:18px}
 
 h3 small{font-size:13px;color:var(--muted);font-weight:400}
+
+.form-grid.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}h3 small{font-size:13px;color:var(--muted);font-weight:400}

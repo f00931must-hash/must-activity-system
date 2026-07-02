@@ -54,6 +54,7 @@ function renderForm(){
       <label>學號 *</label><input class="field" name="studentId" required>
       <h3>一、活動滿意度</h3>
       ${qs.map((q,i) => likertHtml(q,i)).join("")}
+      ${feedbackTextHtml(activity.feedbackTextQuestions || [])}
       <h3>二、參與活動後，我的心得與感想</h3>
       <p class="meta">請至少填寫 ${min} 字。</p>
       <textarea class="field" name="comment" required></textarea>
@@ -62,6 +63,17 @@ function renderForm(){
     </form>
   `;
   $("fbForm").addEventListener("submit", submitForm);
+}
+
+function feedbackTextHtml(questions){
+  if(!questions.length) return "";
+  return `<h3>二、回饋簡答題目</h3>` + questions.map((q,i)=>{
+    const req = q.required ? "required" : "";
+    if(q.type === "text"){
+      return `<label>${esc(q.label)} ${q.required ? "*" : ""}</label><input class="field" name="text_${i}" ${req}>`;
+    }
+    return `<label>${esc(q.label)} ${q.required ? "*" : ""}</label><textarea class="field" name="text_${i}" ${req}></textarea>`;
+  }).join("");
 }
 
 function likertHtml(q,i){
@@ -107,12 +119,15 @@ async function submitForm(e){
   const qs = activity.feedbackQuestions || defaultQuestions();
   const ratings = {};
   qs.forEach((q,i) => ratings[q] = fd.get("q_" + i));
+  const textAnswers = {};
+  (activity.feedbackTextQuestions || []).forEach((q,i) => textAnswers[q.label] = fd.get("text_" + i) || "");
 
   try{
     await setDoc(fbRef, {
       name: nameInput,
       studentId: studentIdKey,
       ratings,
+      textAnswers,
       comment,
       createdAt: serverTimestamp()
     });
