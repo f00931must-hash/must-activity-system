@@ -312,7 +312,7 @@ async function saveActivity(event){
     date: val("date"),
     time: val("time").trim(),
     location: val("location").trim(),
-    tags: getSelectedTags(),
+    tags: [...new Set(getSelectedTags())],
     description: val("description").trim(),
     capacity: Number(val("capacity") || 0),
     status: val("status") || "open",
@@ -608,8 +608,9 @@ function tagColorClass(tag){
 }
 
 function tagHtml(tags){
-  if(!tags || !tags.length) return "";
-  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+  const uniqueTags = [...new Set((tags || []).filter(Boolean))];
+  if(!uniqueTags.length) return "";
+  return `<div class="tag-row">${uniqueTags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
 }
 
 function esc(str){ return String(str || "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
