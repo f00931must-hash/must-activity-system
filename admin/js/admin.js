@@ -602,19 +602,20 @@ async function exportRegistrations(id){
   const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期 健康與諮商中心`;
   const titleLine = `資源教室「${esc(a.title || "")}」活動簽到表`;
 
+  const minRows = 30;
   const pairedRows = [];
-  for(let i=0; i<Math.max(rows.length, 30); i+=2){
+  for(let i=0; i<Math.max(rows.length, minRows); i+=2){
     pairedRows.push([rows[i] || null, rows[i+1] || null]);
   }
 
-  function block(r, idx){
+  function block(r){
     if(!r){
-      return `<td></td><td></td><td></td><td class="gender">□男 □女</td>`;
+      return `<td class="name-cell"></td><td class="sign-cell"></td><td class="dept-cell"></td><td class="gender-cell">□男 □女</td>`;
     }
-    return `<td>${esc(r.name || "")}</td><td></td><td>${esc(r.department || "")}</td><td class="gender">□男 □女</td>`;
+    return `<td class="name-cell">${esc(r.name || "")}</td><td class="sign-cell"></td><td class="dept-cell">${esc(r.department || "")}</td><td class="gender-cell">□男 □女</td>`;
   }
 
-  const bodyRows = pairedRows.map((pair, i)=>`<tr>${block(pair[0], i*2+1)}${block(pair[1], i*2+2)}</tr>`).join("");
+  const bodyRows = pairedRows.map(pair=>`<tr>${block(pair[0])}${block(pair[1])}</tr>`).join("");
 
   const html = `<!doctype html><html><head><meta charset="utf-8">
   <style>
@@ -624,17 +625,27 @@ async function exportRegistrations(id){
     .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.35}
     h1{font-size:20pt;text-align:center;margin:4pt 0 10pt;font-family:'DFKai-SB','標楷體','BiauKai',serif}
     .meta{font-size:12pt;margin:4pt 0}
-    table{border-collapse:collapse;width:100%;font-size:12pt;margin-top:8pt}
-    td,th{border:1px solid #333;padding:5pt;vertical-align:middle;font-size:12pt;height:26pt}
+    table{border-collapse:collapse;table-layout:fixed;width:100%;font-size:12pt;margin-top:8pt;mso-table-layout-alt:fixed}
+    td,th{border:1px solid #333;padding:3pt;vertical-align:middle;font-size:12pt;height:26pt;overflow:hidden}
     th{text-align:center;font-weight:bold}
-    .name{width:2.1cm}.sign{width:2.1cm}.dept{width:3cm}.gender{text-align:center;white-space:nowrap}
+    .name-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
+    .sign-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
+    .dept-cell{width:3cm;mso-width-source:userset;mso-width-alt:1701}
+    .gender-cell{width:1.35cm;mso-width-source:userset;text-align:center;white-space:nowrap}
   </style></head><body><div class="WordSection1">
     <div class="top">${headerLine}</div>
     <h1>${titleLine}</h1>
     <p class="meta">時間：${timeText}</p>
     <p class="meta">地點：${esc(a.location || "")}</p>
     <table>
-      <tr><th class="name">姓名</th><th class="sign">簽到欄</th><th class="dept">系級/班級</th><th class="gender">性別</th><th class="name">姓名</th><th class="sign">簽到欄</th><th class="dept">系級/班級</th><th class="gender">性別</th></tr>
+      <colgroup>
+        <col style="width:2.1cm"><col style="width:2.1cm"><col style="width:3cm"><col style="width:1.35cm">
+        <col style="width:2.1cm"><col style="width:2.1cm"><col style="width:3cm"><col style="width:1.35cm">
+      </colgroup>
+      <tr>
+        <th class="name-cell">姓名</th><th class="sign-cell">簽到欄</th><th class="dept-cell">系級/班級</th><th class="gender-cell">性別</th>
+        <th class="name-cell">姓名</th><th class="sign-cell">簽到欄</th><th class="dept-cell">系級/班級</th><th class="gender-cell">性別</th>
+      </tr>
       ${bodyRows}
     </table>
   </div></body></html>`;
