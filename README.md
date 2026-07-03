@@ -1,4 +1,4 @@
-# MUST Activity System v2.3.1
+# MUST Activity System v2.3.2
 
 活動報名與回饋管理平台。
 
@@ -189,3 +189,8 @@
 - 簽到表欄寬改用 colgroup + table-layout fixed 固定。
 - 姓名 2.1cm、簽到欄 2.1cm、系級/班級 3cm。
 - 性別欄固定 1.35cm，避免 Word 自動壓縮其他欄位造成換行。
+
+## v2.3.2
+- 簽到表欄寬改為固定表格總寬 17.1cm。
+- 每個 th/td 直接加入 Word 可讀的 width 與 mso-width-alt。
+- 姓名 2.1cm、簽到欄 2.1cm、系級/班級 3cm、性別 1.35cm。
