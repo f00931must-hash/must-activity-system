@@ -1,4 +1,4 @@
-# MUST Activity System v2.2.1
+# MUST Activity System v2.3
 
 活動報名與回饋管理平台。
 
@@ -179,3 +179,8 @@
 - 附件上傳改為 GitHub Token 上傳到 repo 的 uploads/activity-attachments/。
 - Firestore 只保存附件名稱、網址、類型與路徑。
 - 新增 GITHUB_UPLOAD_README.md。
+
+## v2.3
+- 簽到表欄寬調整：姓名 2.1cm、簽到欄 2.1cm、系級/班級 3cm，並取消姓名前流水號。
+- 報名自訂欄位新增「圖片單選」：老師可設定多個圖片選項，學生端會顯示圖片，報名資料只記錄選項文字。
+- 首頁附件改成「附件1 / 附件2」短文字按鈕，避免長檔名擠壓活動卡片。

@@ -71,6 +71,17 @@ function renderForm(){
 
 function fieldHtml(f, i){
   const req = f.required ? "required" : "";
+  if(f.type === "imageRadio"){
+    return `<label>${esc(f.label)} ${f.required ? "*" : ""}</label>
+      <div class="image-choice-grid">
+        ${(f.imageOptions || []).filter(o => o.label).map(o => `
+          <label class="image-choice-card">
+            <input type="radio" name="custom_${i}" value="${esc(o.label)}" ${req}>
+            ${o.imageUrl ? `<img src="${esc(o.imageUrl)}" alt="${esc(o.label)}">` : ""}
+            <span>${esc(o.label)}</span>
+          </label>`).join("")}
+      </div>`;
+  }
   if(f.type === "radio"){
     return `<label>${esc(f.label)} ${f.required ? "*" : ""}</label>` +
       (f.options || []).map(o => `<label class="radio-row"><input type="radio" name="custom_${i}" value="${esc(o)}" ${req}> ${esc(o)}</label>`).join("");
@@ -125,8 +136,10 @@ function parseLocalTime(value){
 }
 
 function attachmentHtml(files){
-  if(!files.length) return "";
-  return `<h3>活動附件</h3>${files.map(f => `<p>📎 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || f.url)}</a></p>`).join("")}`;
+  if(!files || !files.length) return "";
+  return `<div class="attachment-list compact-attachments">
+    ${files.map((f,i) => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 附件${files.length > 1 ? i+1 : ""}</a>`).join("")}
+  </div>`;
 }
 
 function tagColorClass(tag){

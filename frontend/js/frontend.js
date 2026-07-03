@@ -83,7 +83,9 @@ function activityCard(a){
 
 function attachmentHtml(files){
   if(!files || !files.length) return "";
-  return `<div class="attachment-list">${files.map(f => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 ${esc(f.name || "附件")}</a>`).join("")}</div>`;
+  return `<div class="attachment-list compact-attachments">
+    ${files.map((f,i) => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 附件${files.length > 1 ? i+1 : ""}</a>`).join("")}
+  </div>`;
 }
 
 function statusText(status){

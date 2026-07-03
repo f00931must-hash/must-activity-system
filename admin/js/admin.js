@@ -343,14 +343,30 @@ function renderRegFields(){
           <option value="text" ${f.type==="text"?"selected":""}>簡答</option>
           <option value="textarea" ${f.type==="textarea"?"selected":""}>段落</option>
           <option value="radio" ${f.type==="radio"?"selected":""}>單選</option>
+          <option value="imageRadio" ${f.type==="imageRadio"?"selected":""}>圖片單選</option>
         </select>
         <button type="button" class="ghost-btn reg-remove" data-i="${i}">移除</button>
       </div>
       <label><input type="checkbox" class="reg-required" data-i="${i}" ${f.required?"checked":""}> 必填</label>
-      <input class="field reg-options" data-i="${i}" value="${esc((f.options||[]).join(','))}" placeholder="單選選項，用逗號分隔">
+      ${f.type === "imageRadio" ? imageOptionEditor(f,i) : `<input class="field reg-options" data-i="${i}" value="${esc((f.options||[]).join(','))}" placeholder="單選選項，用逗號分隔">`}
     </div>`).join("") : '<div class="empty">目前沒有自訂題目；系統已內建姓名、系級、學號、電話、餐點。</div>';
   setHtml("registerFieldsBox", html);
   bindFieldEvents();
+}
+
+function imageOptionEditor(field, fieldIndex){
+  const opts = field.imageOptions || [];
+  return `<div class="image-option-box">
+    <p class="hint">每個選項填「名稱」與「圖片網址」。學生端會看到圖片，報名資料只會記錄選項名稱。</p>
+    ${opts.map((o,j)=>`
+      <div class="image-option-row">
+        <input class="field image-opt-label" data-i="${fieldIndex}" data-j="${j}" value="${esc(o.label || "")}" placeholder="選項名稱，例如：兔子">
+        <input class="field image-opt-url" data-i="${fieldIndex}" data-j="${j}" value="${esc(o.imageUrl || "")}" placeholder="圖片網址">
+        <button type="button" class="ghost-btn image-opt-remove" data-i="${fieldIndex}" data-j="${j}">移除</button>
+        ${o.imageUrl ? `<img class="image-option-preview" src="${esc(o.imageUrl)}" alt="${esc(o.label || "圖片選項")}">` : ""}
+      </div>`).join("")}
+    <button type="button" class="ghost-btn image-opt-add" data-i="${fieldIndex}">＋新增圖片選項</button>
+  </div>`;
 }
 
 function renderFbQuestions(){
@@ -386,9 +402,36 @@ function renderFeedbackTextQuestions(){
 
 function bindFieldEvents(){
   document.querySelectorAll(".reg-label").forEach(el => el.oninput = () => regFields[Number(el.dataset.i)].label = el.value);
-  document.querySelectorAll(".reg-type").forEach(el => el.onchange = () => regFields[Number(el.dataset.i)].type = el.value);
+  document.querySelectorAll(".reg-type").forEach(el => el.onchange = () => {
+    const i = Number(el.dataset.i);
+    regFields[i].type = el.value;
+    if(el.value === "imageRadio" && !regFields[i].imageOptions) regFields[i].imageOptions = [];
+    renderRegFields();
+  });
   document.querySelectorAll(".reg-required").forEach(el => el.onchange = () => regFields[Number(el.dataset.i)].required = el.checked);
   document.querySelectorAll(".reg-options").forEach(el => el.oninput = () => regFields[Number(el.dataset.i)].options = el.value.split(",").map(x=>x.trim()).filter(Boolean));
+  document.querySelectorAll(".image-opt-label").forEach(el => el.oninput = () => {
+    const f = regFields[Number(el.dataset.i)];
+    f.imageOptions = f.imageOptions || [];
+    f.imageOptions[Number(el.dataset.j)].label = el.value;
+  });
+  document.querySelectorAll(".image-opt-url").forEach(el => el.oninput = () => {
+    const f = regFields[Number(el.dataset.i)];
+    f.imageOptions = f.imageOptions || [];
+    f.imageOptions[Number(el.dataset.j)].imageUrl = el.value;
+  });
+  document.querySelectorAll(".image-opt-add").forEach(el => el.onclick = () => {
+    const f = regFields[Number(el.dataset.i)];
+    f.imageOptions = f.imageOptions || [];
+    f.imageOptions.push({label:"", imageUrl:""});
+    renderRegFields();
+  });
+  document.querySelectorAll(".image-opt-remove").forEach(el => el.onclick = () => {
+    const f = regFields[Number(el.dataset.i)];
+    f.imageOptions = f.imageOptions || [];
+    f.imageOptions.splice(Number(el.dataset.j),1);
+    renderRegFields();
+  });
   document.querySelectorAll(".reg-remove").forEach(el => el.onclick = () => { regFields.splice(Number(el.dataset.i),1); renderRegFields(); });
   document.querySelectorAll(".fb-question").forEach(el => el.oninput = () => fbQuestions[Number(el.dataset.i)] = el.value);
   document.querySelectorAll(".fb-remove").forEach(el => el.onclick = () => { fbQuestions.splice(Number(el.dataset.i),1); renderFbQuestions(); });
@@ -568,7 +611,7 @@ async function exportRegistrations(id){
     if(!r){
       return `<td></td><td></td><td></td><td class="gender">□男 □女</td>`;
     }
-    return `<td>${idx}. ${esc(r.name || "")}</td><td></td><td>${esc(r.department || "")}</td><td class="gender">□男 □女</td>`;
+    return `<td>${esc(r.name || "")}</td><td></td><td>${esc(r.department || "")}</td><td class="gender">□男 □女</td>`;
   }
 
   const bodyRows = pairedRows.map((pair, i)=>`<tr>${block(pair[0], i*2+1)}${block(pair[1], i*2+2)}</tr>`).join("");
@@ -584,7 +627,7 @@ async function exportRegistrations(id){
     table{border-collapse:collapse;width:100%;font-size:12pt;margin-top:8pt}
     td,th{border:1px solid #333;padding:5pt;vertical-align:middle;font-size:12pt;height:26pt}
     th{text-align:center;font-weight:bold}
-    .name{width:19%}.sign{width:12%}.dept{width:14%}.gender{width:10%;text-align:center;white-space:nowrap}
+    .name{width:2.1cm}.sign{width:2.1cm}.dept{width:3cm}.gender{text-align:center;white-space:nowrap}
   </style></head><body><div class="WordSection1">
     <div class="top">${headerLine}</div>
     <h1>${titleLine}</h1>
