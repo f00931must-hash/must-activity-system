@@ -62,7 +62,7 @@ function activityCard(a){
   return `<article class="activity-card">
     <div class="activity-head">
       <div class="status-tags">
-        <span class="badge">${esc(statusText(a.status))}</span>
+        <span class="badge">${esc(statusText(a.status))}</span>${tagHtml(a.tags || [])}
         ${tagHtml(a.tags || [])}
       </div>
       <h2>${esc(a.title || "未命名活動")}</h2>

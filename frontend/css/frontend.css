@@ -20,3 +20,5 @@
 .tag-purple{background:#f3e8ff;color:#6b21a8;border-color:#e9d5ff}
 .tag-rose{background:#ffe4e6;color:#be123c;border-color:#fecdd3}
 .tag-orange{background:#ffedd5;color:#c2410c;border-color:#fed7aa}
+
+.status-tags .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin:0}
