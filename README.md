@@ -1,4 +1,4 @@
-# MUST Activity System v2.1.1
+# MUST Activity System v2.1.2
 
 活動報名與回饋管理平台。
 
@@ -148,3 +148,6 @@
 
 ## v2.1.1
 - 徹底移除 frontend.js 重複 tagHtml/tagColorClass 宣告，修正首頁活動列表卡在載入中。
+
+## v2.1.2
+- 直接重建乾淨的 frontend/js/frontend.js，徹底修正 tagHtml 重複宣告造成首頁卡在載入中。
