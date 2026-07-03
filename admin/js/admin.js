@@ -613,7 +613,7 @@ async function exportRegistrations(id){
   const wName = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wSign = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wDept = 'style="width:3cm;mso-width-source:userset;mso-width-alt:1701" width="113"';
-  const wGender = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191;text-align:center;white-space:nowrap" width="79"';
+  const wGender = 'style="width:2.3cm;mso-width-source:userset;mso-width-alt:1304;text-align:center;white-space:nowrap" width="87"';
 
   function block(r){
     if(!r){
@@ -632,22 +632,22 @@ async function exportRegistrations(id){
     .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.35}
     h1{font-size:20pt;text-align:center;margin:4pt 0 10pt;font-family:'DFKai-SB','標楷體','BiauKai',serif}
     .meta{font-size:12pt;margin:4pt 0}
-    table{border-collapse:collapse;table-layout:fixed;width:18.6cm;font-size:12pt;margin-top:8pt;mso-table-layout-alt:fixed}
+    table{border-collapse:collapse;table-layout:fixed;width:19cm;font-size:12pt;margin-top:8pt;mso-table-layout-alt:fixed}
     td,th{border:1px solid #333;padding:2pt;vertical-align:middle;font-size:12pt;height:0.92cm;overflow:hidden;mso-padding-alt:2pt 2pt 2pt 2pt}
     th{text-align:center;font-weight:bold}
     .name-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
     .sign-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
     .dept-cell{width:3cm;mso-width-source:userset;mso-width-alt:1701}
-    .gender-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191;text-align:center;white-space:nowrap}
+    .gender-cell{width:2.3cm;mso-width-source:userset;mso-width-alt:1304;text-align:center;white-space:nowrap}
   </style></head><body><div class="WordSection1">
     <div class="top">${headerLine}</div>
     <h1>${titleLine}</h1>
     <p class="meta">時間：${timeText}</p>
     <p class="meta">地點：${esc(a.location || "")}</p>
-    <table width="703" style="width:18.6cm;table-layout:fixed">
+    <table width="718" style="width:19cm;table-layout:fixed">
       <colgroup>
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="79" style="width:2.1cm">
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="79" style="width:2.1cm">
+        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="87" style="width:2.3cm">
+        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="87" style="width:2.3cm">
       </colgroup>
       <tr style="height:0.92cm">
         <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>系級/班級</th><th class="gender-cell" ${wGender}>性別</th>
