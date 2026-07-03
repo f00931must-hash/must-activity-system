@@ -270,18 +270,42 @@ function arrayBufferToBase64(buffer){
   return btoa(binary);
 }
 
+async function uploadFileToGithub(file, folder="activity-attachments"){
+  const token = getGithubToken();
+  if(!token){
+    throw new Error("尚未設定 GitHub Token，請先到系統設定貼上 Token。");
+  }
+  const info = githubRepoInfo();
+  const safeName = file.name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9._-]/g, "_");
+  const path = `uploads/${folder}/${Date.now()}_${safeName}`;
+  const content = arrayBufferToBase64(await file.arrayBuffer());
+
+  const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Accept": "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: `upload file: ${safeName}`,
+      content,
+      branch: info.branch
+    })
+  });
+
+  if(!res.ok){
+    const err = await res.json().catch(()=>({message:res.statusText}));
+    throw new Error(err.message || "GitHub upload failed");
+  }
+  return { name:file.name, url:`${siteConfig.baseUrl}${path}`, type:file.type || "", path };
+}
+
 async function uploadAttachment(){
   const fileInput = $("attachmentFile");
   const file = fileInput?.files?.[0];
   if(!file){
     alert("請先選擇圖片或 PDF 檔案。");
-    return;
-  }
-
-  const token = getGithubToken();
-  if(!token){
-    alert("請先到「系統設定」貼上 GitHub Token，才可以上傳附件。");
-    showView("settings");
     return;
   }
 
@@ -299,37 +323,14 @@ async function uploadAttachment(){
   }
 
   try{
-    const info = githubRepoInfo();
-    const safeName = file.name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9._-]/g, "_");
-    const path = `${info.folder}/${Date.now()}_${safeName}`;
-    const content = arrayBufferToBase64(await file.arrayBuffer());
-
-    const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {
-      method: "PUT",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message: `upload attachment: ${safeName}`,
-        content,
-        branch: info.branch
-      })
-    });
-
-    if(!res.ok){
-      const err = await res.json().catch(()=>({message:res.statusText}));
-      throw new Error(err.message || "GitHub upload failed");
-    }
-
-    const url = `${siteConfig.baseUrl}${path}`;
-    attachments.push({ name:file.name, url, type:file.type || "", path });
+    const uploaded = await uploadFileToGithub(file, "activity-attachments");
+    attachments.push(uploaded);
     fileInput.value = "";
     renderAttachments();
     alert("附件已上傳到 GitHub。");
   }catch(err){
     console.error(err);
+    if(String(err.message).includes("Token")) showView("settings");
     alert("附件上傳失敗：" + err.message);
   }
 }
@@ -357,14 +358,22 @@ function renderRegFields(){
 function imageOptionEditor(field, fieldIndex){
   const opts = field.imageOptions || [];
   return `<div class="image-option-box">
-    <p class="hint">每個選項填「名稱」與「圖片網址」。學生端會看到圖片，報名資料只會記錄選項名稱。</p>
-    ${opts.map((o,j)=>`
-      <div class="image-option-row">
-        <input class="field image-opt-label" data-i="${fieldIndex}" data-j="${j}" value="${esc(o.label || "")}" placeholder="選項名稱，例如：兔子">
-        <input class="field image-opt-url" data-i="${fieldIndex}" data-j="${j}" value="${esc(o.imageUrl || "")}" placeholder="圖片網址">
-        <button type="button" class="ghost-btn image-opt-remove" data-i="${fieldIndex}" data-j="${j}">移除</button>
-        ${o.imageUrl ? `<img class="image-option-preview" src="${esc(o.imageUrl)}" alt="${esc(o.label || "圖片選項")}">` : ""}
-      </div>`).join("")}
+    <p class="hint">每個選項填名稱，圖片可用「選擇圖片」或點選貼上區後 Ctrl+V 貼上（支援 Win+Shift+S 截圖）。學生端會看到圖片，報名資料只記錄選項名稱。</p>
+    <div class="image-option-grid">
+      ${opts.map((o,j)=>`
+        <div class="image-option-card">
+          <input class="field image-opt-label" data-i="${fieldIndex}" data-j="${j}" value="${esc(o.label || "")}" placeholder="選項名稱，例如：兔子">
+          <div class="image-paste-zone" tabindex="0" data-i="${fieldIndex}" data-j="${j}">
+            ${o.imageUrl ? `<img class="image-option-preview" src="${esc(o.imageUrl)}" alt="${esc(o.label || "圖片選項")}">` : `<span>點這裡後 Ctrl+V<br>或選擇圖片</span>`}
+          </div>
+          <input type="file" class="image-opt-file hidden-file" data-i="${fieldIndex}" data-j="${j}" accept="image/*">
+          <div class="image-option-actions">
+            <button type="button" class="ghost-btn image-opt-upload" data-i="${fieldIndex}" data-j="${j}">選擇圖片</button>
+            <button type="button" class="ghost-btn danger-btn image-opt-clear" data-i="${fieldIndex}" data-j="${j}">清除圖片</button>
+            <button type="button" class="ghost-btn danger-btn image-opt-remove" data-i="${fieldIndex}" data-j="${j}">刪除選項</button>
+          </div>
+        </div>`).join("")}
+    </div>
     <button type="button" class="ghost-btn image-opt-add" data-i="${fieldIndex}">＋新增圖片選項</button>
   </div>`;
 }
@@ -400,6 +409,47 @@ function renderFeedbackTextQuestions(){
   bindFieldEvents();
 }
 
+
+async function uploadImageOptionFile(fieldIndex, optionIndex, file){
+  if(!file) return;
+  if(!file.type.startsWith("image/")){
+    alert("圖片選項只能上傳圖片檔。");
+    return;
+  }
+  if(file.size > 10 * 1024 * 1024){
+    alert("圖片太大，建議 10MB 以下。");
+    return;
+  }
+  try{
+    const uploaded = await uploadFileToGithub(file, "image-options");
+    const f = regFields[fieldIndex];
+    f.imageOptions = f.imageOptions || [];
+    f.imageOptions[optionIndex] = f.imageOptions[optionIndex] || {label:"", imageUrl:""};
+    f.imageOptions[optionIndex].imageUrl = uploaded.url;
+    f.imageOptions[optionIndex].imageName = uploaded.name;
+    f.imageOptions[optionIndex].imagePath = uploaded.path;
+    renderRegFields();
+  }catch(err){
+    console.error(err);
+    if(String(err.message).includes("Token")) showView("settings");
+    alert("圖片上傳失敗：" + err.message);
+  }
+}
+
+async function handleImageOptionPaste(event){
+  const zone = event.target.closest(".image-paste-zone");
+  if(!zone) return;
+  const items = event.clipboardData?.items || [];
+  const item = Array.from(items).find(x => x.type && x.type.startsWith("image/"));
+  if(!item) return;
+  event.preventDefault();
+  const file = item.getAsFile();
+  if(file){
+    const namedFile = new File([file], `clipboard_${Date.now()}.png`, {type:file.type || "image/png"});
+    await uploadImageOptionFile(Number(zone.dataset.i), Number(zone.dataset.j), namedFile);
+  }
+}
+
 function bindFieldEvents(){
   document.querySelectorAll(".reg-label").forEach(el => el.oninput = () => regFields[Number(el.dataset.i)].label = el.value);
   document.querySelectorAll(".reg-type").forEach(el => el.onchange = () => {
@@ -415,10 +465,31 @@ function bindFieldEvents(){
     f.imageOptions = f.imageOptions || [];
     f.imageOptions[Number(el.dataset.j)].label = el.value;
   });
-  document.querySelectorAll(".image-opt-url").forEach(el => el.oninput = () => {
+  document.querySelectorAll(".image-opt-upload").forEach(el => el.onclick = () => {
+    document.querySelector(`.image-opt-file[data-i="${el.dataset.i}"][data-j="${el.dataset.j}"]`)?.click();
+  });
+  document.querySelectorAll(".image-opt-file").forEach(el => el.onchange = () => {
+    const file = el.files?.[0];
+    if(file) uploadImageOptionFile(Number(el.dataset.i), Number(el.dataset.j), file);
+  });
+  document.querySelectorAll(".image-paste-zone").forEach(el => {
+    el.onpaste = handleImageOptionPaste;
+    el.ondragover = e => { e.preventDefault(); el.classList.add("drag-over"); };
+    el.ondragleave = () => el.classList.remove("drag-over");
+    el.ondrop = e => {
+      e.preventDefault();
+      el.classList.remove("drag-over");
+      const file = e.dataTransfer?.files?.[0];
+      if(file) uploadImageOptionFile(Number(el.dataset.i), Number(el.dataset.j), file);
+    };
+  });
+  document.querySelectorAll(".image-opt-clear").forEach(el => el.onclick = () => {
     const f = regFields[Number(el.dataset.i)];
     f.imageOptions = f.imageOptions || [];
-    f.imageOptions[Number(el.dataset.j)].imageUrl = el.value;
+    f.imageOptions[Number(el.dataset.j)].imageUrl = "";
+    f.imageOptions[Number(el.dataset.j)].imageName = "";
+    f.imageOptions[Number(el.dataset.j)].imagePath = "";
+    renderRegFields();
   });
   document.querySelectorAll(".image-opt-add").forEach(el => el.onclick = () => {
     const f = regFields[Number(el.dataset.i)];
