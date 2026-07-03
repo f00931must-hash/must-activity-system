@@ -1,4 +1,4 @@
-# MUST Activity System v2.0.2
+# MUST Activity System v2.1
 
 活動報名與回饋管理平台。
 
@@ -140,3 +140,8 @@
 - 學生查詢獨立在側邊欄，並移除活動管理內重複區塊。
 - 標籤改為在系統設定建立，活動新增/修改用勾選。
 - 修正學生查詢按鈕無反應。
+
+## v2.1
+- 修正首頁 frontend.js 的 tagHtml 重複宣告，活動列表可正常載入。
+- 修正學生查詢 lookupStudentActivities 未定義，查詢按鈕可正常執行。
+- 整理標籤 helper，避免後續重複宣告造成 JS 中斷。

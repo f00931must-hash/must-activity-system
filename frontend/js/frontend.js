@@ -11,9 +11,10 @@ function tagColorClass(tag){
   String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
   return classes[sum % classes.length];
 }
+
 function tagHtml(tags){
   if(!tags || !tags.length) return "";
-  return `<div class="tag-row">${tags.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
 }
 
 function esc(str){return String(str||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}

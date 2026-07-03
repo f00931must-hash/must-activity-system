@@ -385,6 +385,69 @@ async function viewRegistrations(id){
   $("modal")?.classList.remove("hidden");
 }
 
+async function lookupStudentActivities(){
+  const input = val("studentLookupInput").trim().toUpperCase();
+  if(!input){
+    setHtml("studentLookupResult", '<div class="empty">請先輸入學號。</div>');
+    return;
+  }
+
+  setHtml("studentLookupResult", '<div class="empty">查詢中...</div>');
+  const rows = [];
+
+  for(const a of activities){
+    try{
+      let regData = null;
+      let regId = input;
+
+      const directSnap = await getDoc(doc(db, "activities", a.id, "registrations", input));
+      if(directSnap.exists()){
+        regData = directSnap.data();
+        regId = directSnap.id;
+      }else{
+        const regsSnap = await getDocs(collection(db, "activities", a.id, "registrations"));
+        const found = regsSnap.docs.find(d => String(d.data().studentId || d.id || "").trim().toUpperCase() === input);
+        if(found){
+          regData = found.data();
+          regId = found.id;
+        }
+      }
+
+      if(regData){
+        let hasFeedback = false;
+        const fbDirect = await getDoc(doc(db, "activities", a.id, "feedbacks", regId));
+        if(fbDirect.exists()){
+          hasFeedback = true;
+        }else{
+          const fbsSnap = await getDocs(collection(db, "activities", a.id, "feedbacks"));
+          hasFeedback = fbsSnap.docs.some(d => String(d.data().studentId || d.id || "").trim().toUpperCase() === input);
+        }
+        rows.push({ activity:a, reg:regData, hasFeedback });
+      }
+    }catch(err){
+      console.warn("lookup skipped", a.id, err);
+    }
+  }
+
+  if(!rows.length){
+    setHtml("studentLookupResult", `<div class="empty">查無 ${esc(input)} 的活動報名紀錄。</div>`);
+    return;
+  }
+
+  setHtml("studentLookupResult", `<table class="data-table">
+    <thead><tr><th>#</th><th>活動</th><th>日期</th><th>地點</th><th>餐點</th><th>回饋</th><th>標籤</th></tr></thead>
+    <tbody>${rows.map((row,i)=>`<tr>
+      <td>${i+1}</td>
+      <td>${esc(row.activity.title)}</td>
+      <td>${esc(row.activity.date || "")}</td>
+      <td>${esc(row.activity.location || "")}</td>
+      <td>${esc(row.reg.meal || "")}</td>
+      <td>${row.hasFeedback ? "已填" : "未填"}</td>
+      <td>${tagHtml(row.activity.tags || [])}</td>
+    </tr>`).join("")}</tbody>
+  </table>`);
+}
+
 async function exportRegistrations(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
@@ -500,14 +563,17 @@ function weekdayText(dateStr){
 
 
 function tagColorClass(tag){
-  const classes=["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
-  let sum=0; String(tag||"").split("").forEach(ch=>sum+=ch.charCodeAt(0));
-  return classes[sum%classes.length];
+  const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
+  let sum = 0;
+  String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
+  return classes[sum % classes.length];
 }
+
 function tagHtml(tags){
   if(!tags || !tags.length) return "";
-  return `<div class="tag-row">${tags.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
 }
+
 function getSelectedTags(){
   return Array.from(document.querySelectorAll(".tag-check:checked")).map(el=>el.value);
 }
