@@ -611,7 +611,7 @@ async function exportRegistrations(id){
   const wName = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wSign = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wDept = 'style="width:3cm;mso-width-source:userset;mso-width-alt:1701" width="113"';
-  const wGender = 'style="width:1.35cm;mso-width-source:userset;mso-width-alt:765;text-align:center;white-space:nowrap" width="51"';
+  const wGender = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191;text-align:center;white-space:nowrap" width="79"';
 
   function block(r){
     if(!r){
@@ -636,7 +636,7 @@ async function exportRegistrations(id){
     .name-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
     .sign-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
     .dept-cell{width:3cm;mso-width-source:userset;mso-width-alt:1701}
-    .gender-cell{width:1.35cm;mso-width-source:userset;mso-width-alt:765;text-align:center;white-space:nowrap}
+    .gender-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191;text-align:center;white-space:nowrap}
   </style></head><body><div class="WordSection1">
     <div class="top">${headerLine}</div>
     <h1>${titleLine}</h1>
@@ -644,8 +644,8 @@ async function exportRegistrations(id){
     <p class="meta">地點：${esc(a.location || "")}</p>
     <table width="647" style="width:17.1cm;table-layout:fixed">
       <colgroup>
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="51" style="width:1.35cm">
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="51" style="width:1.35cm">
+        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="79" style="width:2.1cm">
+        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="79" style="width:2.1cm">
       </colgroup>
       <tr style="height:0.92cm">
         <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>系級/班級</th><th class="gender-cell" ${wGender}>性別</th>
