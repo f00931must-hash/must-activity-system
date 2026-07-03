@@ -125,3 +125,8 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
 .attachment-item .attach-row{display:grid;grid-template-columns:1.1fr 1.7fr auto auto;gap:8px;align-items:center}
 .attachment-preview{max-width:180px;max-height:120px;border:1px solid #dbeafe;border-radius:12px;margin-top:8px;object-fit:cover}
 @media(max-width:800px){.upload-row,.attachment-item .attach-row{grid-template-columns:1fr}}
+
+.image-option-box{margin-top:10px;display:flex;flex-direction:column;gap:10px}
+.image-option-row{display:grid;grid-template-columns:1fr 1.4fr auto auto;gap:8px;align-items:center}
+.image-option-preview{width:72px;height:72px;border-radius:12px;object-fit:cover;border:1px solid #dbeafe}
+@media(max-width:900px){.image-option-row{grid-template-columns:1fr}}
