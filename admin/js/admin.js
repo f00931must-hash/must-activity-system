@@ -312,6 +312,7 @@ async function saveActivity(event){
     date: val("date"),
     time: val("time").trim(),
     location: val("location").trim(),
+    tags: getSelectedTags(),
     description: val("description").trim(),
     capacity: Number(val("capacity") || 0),
     status: val("status") || "open",
@@ -563,13 +564,25 @@ function weekdayText(dateStr){
 
 
 function getSelectedTags(){
-  return Array.from(document.querySelectorAll(".tag-check:checked")).map(el=>el.value);
+  return Array.from(document.querySelectorAll("#tagSelectBox .tag-check:checked")).map(el => el.value);
 }
+
 function renderTagSelect(selected=[]){
-  const box=$("tagSelectBox"); if(!box) return;
-  if(!systemTags.length){ box.innerHTML='<div class="empty">尚未建立標籤，請到「系統設定」新增。</div>'; return; }
-  box.innerHTML=systemTags.map(t=>`<label class="tag-check-label"><input type="checkbox" class="tag-check" value="${esc(t)}" ${selected.includes(t)?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join("");
+  const selectedTags = Array.isArray(selected) ? selected : [];
+  const box = $("tagSelectBox");
+  if(!box) return;
+  if(!systemTags.length){
+    box.innerHTML = '<div class="empty">尚未建立標籤，請到「系統設定」新增。</div>';
+    return;
+  }
+  box.innerHTML = systemTags.map(t => `
+    <label class="tag-check-label">
+      <input type="checkbox" class="tag-check" value="${esc(t)}" ${selectedTags.includes(t) ? "checked" : ""}>
+      <span class="tag ${tagColorClass(t)}">${esc(t)}</span>
+    </label>
+  `).join("");
 }
+
 function renderTagManager(){
   const box=$("tagManageBox"); if(!box) return;
   box.innerHTML=systemTags.length ? systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join("") : '<div class="empty">目前尚未建立標籤。</div>';
@@ -580,7 +593,7 @@ async function loadTags(){
   renderTagManager(); renderTagSelect([]);
 }
 async function saveTags(){
-  await setDoc(doc(db,"settings","activityTags"),{tags:systemTags,updatedAt:serverTimestamp()},{merge:true});
+  await setDoc(doc(db,"settings","activityTags"),{tags: systemTags,updatedAt:serverTimestamp()},{merge:true});
   renderTagManager(); renderTagSelect(getSelectedTags());
 }
 
