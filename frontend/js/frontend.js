@@ -5,4 +5,15 @@ const $=id=>document.getElementById(id);let activities=[];onSnapshot(query(colle
   return `<div class="tag-row">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`;
 }
 
+function tagColorClass(tag){
+  const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
+  let sum = 0;
+  String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
+  return classes[sum % classes.length];
+}
+function tagHtml(tags){
+  if(!tags || !tags.length) return "";
+  return `<div class="tag-row">${tags.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+}
+
 function esc(str){return String(str||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}

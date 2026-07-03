@@ -21,7 +21,7 @@ async function init(){
 
 function renderHeader(){
   $("activityHeader").innerHTML = `
-    <span class="badge">${esc(activity.status || "活動")}</span>
+    <div class="status-tags"><span class="badge">${esc(activity.status || "活動")}</span>${tagHtml(activity.tags || [])}</div>
     <h1>${esc(activity.title)}</h1>
     <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.time || "")}</span></div>
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
@@ -127,6 +127,17 @@ function parseLocalTime(value){
 function attachmentHtml(files){
   if(!files.length) return "";
   return `<h3>活動附件</h3>${files.map(f => `<p>📎 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || f.url)}</a></p>`).join("")}`;
+}
+
+function tagColorClass(tag){
+  const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
+  let sum = 0;
+  String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
+  return classes[sum % classes.length];
+}
+function tagHtml(tags){
+  if(!tags || !tags.length) return "";
+  return `<div class="tag-row">${tags.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
 }
 
 function esc(str){

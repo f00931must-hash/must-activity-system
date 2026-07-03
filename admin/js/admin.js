@@ -70,7 +70,7 @@ function showView(view){
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + view)?.classList.remove("hidden");
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",settings:"系統設定"}[view] || "管理平台");
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -107,7 +107,7 @@ function card(a){
   const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "未設定";
   return `<article class="activity-admin-card">
     <div class="activity-card-main">
-      <div class="activity-title-row"><h3>${esc(a.title)}</h3><span class="badge">${statusText(a.status)}</span></div>
+      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml(a.tags || [])}</div></div>
       <div class="activity-info-grid">
         <div><strong>學期</strong><span>${esc(sem)}</span></div>
         <div><strong>日期</strong><span>📅 ${esc(a.date||"")}</span></div>
