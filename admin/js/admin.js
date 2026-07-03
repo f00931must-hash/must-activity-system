@@ -9,6 +9,7 @@ const provider = new GoogleAuthProvider();
 
 let activities = [];
 let adminEmails = [];
+let systemTags = [];
 let currentUser = null;
 let regFields = [];
 let fbQuestions = [];
@@ -94,10 +95,9 @@ function updateStats(){
 }
 
 function renderLists(){
-  const data = activities.filter(a => !adminSearchText || (a.title || "").includes(adminSearchText));
-  const html = data.length ? data.map(card).join("") : '<div class="empty">目前沒有活動</div>';
-  setHtml("activityList", html);
-  setHtml("activityList2", html);
+  const data=activities.filter(a=>!adminSearchText || (a.title||"").includes(adminSearchText) || (a.tags||[]).join(",").includes(adminSearchText));
+  const html=data.length ? data.map(card).join("") : '<div class="empty">目前沒有活動</div>';
+  setHtml("activityList", html); setHtml("activityList2", html);
 }
 
 function card(a){
@@ -498,6 +498,38 @@ function weekdayText(dateStr){
   return ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"][d.getDay()];
 }
 
+
+function tagColorClass(tag){
+  const classes=["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
+  let sum=0; String(tag||"").split("").forEach(ch=>sum+=ch.charCodeAt(0));
+  return classes[sum%classes.length];
+}
+function tagHtml(tags){
+  if(!tags || !tags.length) return "";
+  return `<div class="tag-row">${tags.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+}
+function getSelectedTags(){
+  return Array.from(document.querySelectorAll(".tag-check:checked")).map(el=>el.value);
+}
+function renderTagSelect(selected=[]){
+  const box=$("tagSelectBox"); if(!box) return;
+  if(!systemTags.length){ box.innerHTML='<div class="empty">尚未建立標籤，請到「系統設定」新增。</div>'; return; }
+  box.innerHTML=systemTags.map(t=>`<label class="tag-check-label"><input type="checkbox" class="tag-check" value="${esc(t)}" ${selected.includes(t)?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join("");
+}
+function renderTagManager(){
+  const box=$("tagManageBox"); if(!box) return;
+  box.innerHTML=systemTags.length ? systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join("") : '<div class="empty">目前尚未建立標籤。</div>';
+}
+async function loadTags(){
+  const snap=await getDoc(doc(db,"settings","activityTags"));
+  systemTags=snap.exists() ? (snap.data().tags || []) : [];
+  renderTagManager(); renderTagSelect([]);
+}
+async function saveTags(){
+  await setDoc(doc(db,"settings","activityTags"),{tags:systemTags,updatedAt:serverTimestamp()},{merge:true});
+  renderTagManager(); renderTagSelect(getSelectedTags());
+}
+
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
 function round(n){ return Math.round(n*10)/10; }
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
@@ -515,6 +547,8 @@ bindClick("loginBtn", async (e) => {
 });
 
 bindClick("logoutBtn", () => signOut(auth));
+bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
+bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("newActivityBtn", (e) => { e.preventDefault(); showView("activities"); resetForm(); });
 bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
@@ -586,6 +620,9 @@ document.addEventListener("click", async (e) => {
   const delFb = e.target.closest("[data-delete-fb]");
   if(delFb) return deleteFeedback(delFb.dataset.deleteFb, delFb.dataset.student);
 
+  const remTag=e.target.closest("[data-remove-tag]");
+  if(remTag){ systemTags=systemTags.filter(t=>t!==remTag.dataset.removeTag); await saveTags(); return; }
+
   const removeAdmin = e.target.closest("[data-remove-admin]");
   if(removeAdmin){
     adminEmails = adminEmails.filter(x => x !== removeAdmin.dataset.removeAdmin);
@@ -606,6 +643,7 @@ onAuthStateChanged(auth, async user => {
   }
   currentUser = user;
   await loadAdmins();
+  await loadTags();
   if(!isAdmin(user.email)){
     alert("這個帳號沒有後台權限：" + user.email);
     await signOut(auth);
@@ -617,3 +655,8 @@ onAuthStateChanged(auth, async user => {
   resetForm();
   listenActivities();
 });
+
+const studentLookupInputEl=$("studentLookupInput");
+if(studentLookupInputEl) studentLookupInputEl.addEventListener("keydown", e=>{if(e.key==="Enter"){e.preventDefault(); lookupStudentActivities();}});
+const tagInputEl=$("tagInput");
+if(tagInputEl) tagInputEl.addEventListener("keydown", e=>{if(e.key==="Enter"){e.preventDefault(); $("addTagBtn")?.click();}});

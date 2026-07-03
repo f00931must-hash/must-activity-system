@@ -45,6 +45,11 @@ service cloud.firestore {
       }
     }
 
+    match /settings/activityTags {
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
+    }
+
     match /settings/admins {
       // 讓已登入老師可以讀取名單，才能判斷自己是否為管理者
       allow read: if signedIn();
