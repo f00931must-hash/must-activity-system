@@ -1,4 +1,4 @@
-# MUST Activity System v2.1
+# MUST Activity System v2.1.1
 
 活動報名與回饋管理平台。
 
@@ -145,3 +145,6 @@
 - 修正首頁 frontend.js 的 tagHtml 重複宣告，活動列表可正常載入。
 - 修正學生查詢 lookupStudentActivities 未定義，查詢按鈕可正常執行。
 - 整理標籤 helper，避免後續重複宣告造成 JS 中斷。
+
+## v2.1.1
+- 徹底移除 frontend.js 重複 tagHtml/tagColorClass 宣告，修正首頁活動列表卡在載入中。

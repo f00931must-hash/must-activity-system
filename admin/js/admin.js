@@ -562,18 +562,6 @@ function weekdayText(dateStr){
 }
 
 
-function tagColorClass(tag){
-  const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
-  let sum = 0;
-  String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
-  return classes[sum % classes.length];
-}
-
-function tagHtml(tags){
-  if(!tags || !tags.length) return "";
-  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
-}
-
 function getSelectedTags(){
   return Array.from(document.querySelectorAll(".tag-check:checked")).map(el=>el.value);
 }
@@ -599,6 +587,18 @@ async function saveTags(){
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
 function round(n){ return Math.round(n*10)/10; }
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
+function tagColorClass(tag){
+  const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
+  let sum = 0;
+  String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
+  return classes[sum % classes.length];
+}
+
+function tagHtml(tags){
+  if(!tags || !tags.length) return "";
+  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+}
+
 function esc(str){ return String(str || "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 
 function bindClick(id, handler){
