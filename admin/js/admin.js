@@ -223,15 +223,115 @@ function copyActivity(id){
 
 function renderAttachments(){
   const html = attachments.length ? attachments.map((f,i)=>`
-    <div class="field-item">
+    <div class="field-item attachment-item">
       <div class="attach-row">
         <input class="field att-name" data-i="${i}" value="${esc(f.name || "")}" placeholder="附件名稱，例如 行程表">
-        <input class="field att-url" data-i="${i}" value="${esc(f.url || "")}" placeholder="附件網址，例如 Google Drive / PDF 連結">
+        <input class="field att-url" data-i="${i}" value="${esc(f.url || "")}" placeholder="附件網址">
+        <a class="ghost-btn" href="${esc(f.url || "#")}" target="_blank" rel="noopener">開啟</a>
         <button type="button" class="ghost-btn att-remove" data-i="${i}">移除</button>
       </div>
-    </div>`).join("") : '<div class="empty">目前沒有附件連結</div>';
+      ${f.type && f.type.startsWith("image/") ? `<img class="attachment-preview" src="${esc(f.url)}" alt="${esc(f.name || "附件圖片")}">` : ""}
+    </div>`).join("") : '<div class="empty">目前沒有附件。</div>';
   setHtml("attachmentsBox", html);
   bindFieldEvents();
+}
+function githubRepoInfo(){
+  // 依目前專案固定：f00931must-hash / must-activity-system
+  return {
+    owner: "f00931must-hash",
+    repo: "must-activity-system",
+    branch: "main",
+    folder: "uploads/activity-attachments"
+  };
+}
+
+function getGithubToken(){
+  return localStorage.getItem("must_activity_github_token") || "";
+}
+
+function setGithubToken(token){
+  localStorage.setItem("must_activity_github_token", token || "");
+  renderGithubTokenStatus();
+}
+
+function renderGithubTokenStatus(){
+  const el = $("githubTokenStatus");
+  if(!el) return;
+  el.textContent = getGithubToken() ? "已設定 Token，可上傳附件。" : "尚未設定 Token。";
+}
+
+function arrayBufferToBase64(buffer){
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  for(let i=0; i<bytes.length; i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function uploadAttachment(){
+  const fileInput = $("attachmentFile");
+  const file = fileInput?.files?.[0];
+  if(!file){
+    alert("請先選擇圖片或 PDF 檔案。");
+    return;
+  }
+
+  const token = getGithubToken();
+  if(!token){
+    alert("請先到「系統設定」貼上 GitHub Token，才可以上傳附件。");
+    showView("settings");
+    return;
+  }
+
+  const allowed = file.type.startsWith("image/") || file.type === "application/pdf" ||
+    file.name.toLowerCase().endsWith(".doc") || file.name.toLowerCase().endsWith(".docx") ||
+    file.name.toLowerCase().endsWith(".ppt") || file.name.toLowerCase().endsWith(".pptx");
+  if(!allowed){
+    alert("目前建議上傳圖片、PDF、Word 或 PPT 檔。");
+    return;
+  }
+
+  if(file.size > 20 * 1024 * 1024){
+    alert("檔案太大，建議 20MB 以下。");
+    return;
+  }
+
+  try{
+    const info = githubRepoInfo();
+    const safeName = file.name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9._-]/g, "_");
+    const path = `${info.folder}/${Date.now()}_${safeName}`;
+    const content = arrayBufferToBase64(await file.arrayBuffer());
+
+    const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        message: `upload attachment: ${safeName}`,
+        content,
+        branch: info.branch
+      })
+    });
+
+    if(!res.ok){
+      const err = await res.json().catch(()=>({message:res.statusText}));
+      throw new Error(err.message || "GitHub upload failed");
+    }
+
+    const url = `${siteConfig.baseUrl}${path}`;
+    attachments.push({ name:file.name, url, type:file.type || "", path });
+    fileInput.value = "";
+    renderAttachments();
+    alert("附件已上傳到 GitHub。");
+  }catch(err){
+    console.error(err);
+    alert("附件上傳失敗：" + err.message);
+  }
 }
 
 function renderRegFields(){
@@ -382,7 +482,7 @@ async function viewRegistrations(id){
     <thead><tr><th>#</th><th>姓名</th><th>系級</th><th>學號</th><th>電話</th><th>餐點</th>${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
-  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載報名名單</button></p>`);
+  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
   $("modal")?.classList.remove("hidden");
 }
 
@@ -453,9 +553,50 @@ async function exportRegistrations(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
   const rows = snap.docs.map(d=>d.data());
-  const headers = ["姓名","系級","學號","電話","餐點",...(a.registerFields||[]).map(f=>f.label)];
-  const data = rows.map(r => [r.name,r.department,r.studentId,r.phone,r.meal,...(a.registerFields||[]).map(f=>r.customAnswers?.[f.label]||"")]);
-  downloadCsv(a.title+"_報名名單.csv", [headers,...data]);
+  const week = weekdayText(a.date);
+  const rocDate = rocDateText(a.date);
+  const timeText = a.time ? `${rocDate}${week ? `（${week}）` : ""} ${esc(a.time)}` : `${rocDate}${week ? `（${week}）` : ""}`;
+  const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期 健康與諮商中心`;
+  const titleLine = `資源教室「${esc(a.title || "")}」活動簽到表`;
+
+  const pairedRows = [];
+  for(let i=0; i<Math.max(rows.length, 30); i+=2){
+    pairedRows.push([rows[i] || null, rows[i+1] || null]);
+  }
+
+  function block(r, idx){
+    if(!r){
+      return `<td></td><td></td><td></td><td class="gender">□男 □女</td>`;
+    }
+    return `<td>${idx}. ${esc(r.name || "")}</td><td></td><td>${esc(r.department || "")}</td><td class="gender">□男 □女</td>`;
+  }
+
+  const bodyRows = pairedRows.map((pair, i)=>`<tr>${block(pair[0], i*2+1)}${block(pair[1], i*2+2)}</tr>`).join("");
+
+  const html = `<!doctype html><html><head><meta charset="utf-8">
+  <style>
+    @page WordSection1{size:595.3pt 841.9pt;margin:36pt 36pt 36pt 36pt;mso-header-margin:0pt;mso-footer-margin:0pt}
+    div.WordSection1{page:WordSection1}
+    body{font-family:'DFKai-SB','標楷體','BiauKai',serif;font-size:12pt;line-height:1.35;margin:0}
+    .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.35}
+    h1{font-size:20pt;text-align:center;margin:4pt 0 10pt;font-family:'DFKai-SB','標楷體','BiauKai',serif}
+    .meta{font-size:12pt;margin:4pt 0}
+    table{border-collapse:collapse;width:100%;font-size:12pt;margin-top:8pt}
+    td,th{border:1px solid #333;padding:5pt;vertical-align:middle;font-size:12pt;height:26pt}
+    th{text-align:center;font-weight:bold}
+    .name{width:19%}.sign{width:12%}.dept{width:14%}.gender{width:10%;text-align:center;white-space:nowrap}
+  </style></head><body><div class="WordSection1">
+    <div class="top">${headerLine}</div>
+    <h1>${titleLine}</h1>
+    <p class="meta">時間：${timeText}</p>
+    <p class="meta">地點：${esc(a.location || "")}</p>
+    <table>
+      <tr><th class="name">姓名</th><th class="sign">簽到欄</th><th class="dept">系級/班級</th><th class="gender">性別</th><th class="name">姓名</th><th class="sign">簽到欄</th><th class="dept">系級/班級</th><th class="gender">性別</th></tr>
+      ${bodyRows}
+    </table>
+  </div></body></html>`;
+
+  downloadFile((a.title || "活動") + "_簽到表.doc", html, "application/msword");
 }
 
 async function viewFeedbacks(id){
@@ -555,6 +696,13 @@ function downloadFile(filename, content, type){
   URL.revokeObjectURL(url);
 }
 
+function rocDateText(dateStr){
+  if(!dateStr) return "";
+  const d = new Date(dateStr);
+  if(Number.isNaN(d.getTime())) return esc(dateStr);
+  return `${d.getFullYear()-1911} 年 ${d.getMonth()+1} 月 ${d.getDate()} 日`;
+}
+
 function weekdayText(dateStr){
   if(!dateStr) return "";
   const d = new Date(dateStr);
@@ -627,6 +775,12 @@ bindClick("loginBtn", async (e) => {
 });
 
 bindClick("logoutBtn", () => signOut(auth));
+bindClick("saveGithubTokenBtn", e => {
+  e.preventDefault();
+  setGithubToken(val("githubTokenInput").trim());
+  setVal("githubTokenInput", "");
+  alert("GitHub Token 已儲存在這台電腦的瀏覽器。");
+});
 bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("newActivityBtn", (e) => { e.preventDefault(); showView("activities"); resetForm(); });
@@ -634,6 +788,7 @@ bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
 bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
+bindClick("uploadAttachmentBtn", e => { e.preventDefault(); uploadAttachment(); });
 bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({name:"附件", url:""}); renderAttachments(); });
 
 const activityForm = $("activityForm");
