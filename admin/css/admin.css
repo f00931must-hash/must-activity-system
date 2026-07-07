@@ -154,3 +154,10 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
 .edit-data-form textarea.field{min-height:90px}
 .modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .data-table td .ghost-btn{margin:2px}
+
+.stats-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:10px 0 18px}
+.check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin:10px 0 18px}
+.stats-result{margin-top:18px}
+.summary-cards{margin-bottom:18px}
+.stat-section{margin:18px 0;padding:14px;border:1px solid #dbeafe;border-radius:16px;background:#fff}
+.stat-section h3{margin:0 0 10px}
