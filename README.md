@@ -1,4 +1,4 @@
-# MUST Activity System v2.6.2 Final
+# MUST Activity System v2.6.3 Final
 
 活動報名與回饋管理平台。
 
@@ -225,3 +225,8 @@
 ## v2.6.2 Final
 - 報名名單新增「修改」按鈕，可由老師修正學生填錯的報名資料。
 - 回饋資料新增「修改」按鈕，可由老師修正學生填錯或誤送的回饋內容。
+
+## v2.6.3 Final
+- 修正查看報名名單與查看回饋資料的修改按鈕無法開啟問題。
+- 補上 editRegistration / editFeedback 完整函式。
+- 報名資料與回饋資料可由老師在後台直接修改並儲存。
