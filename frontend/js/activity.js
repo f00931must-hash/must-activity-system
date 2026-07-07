@@ -87,7 +87,17 @@ function renderForm(){
 
 function mealHtml(){
   const opts = (activity.mealOptions && activity.mealOptions.length) ? activity.mealOptions : ["葷","素","不用餐"];
-  return `<label>餐點 *</label>` + opts.map((o,i)=>`<label class="radio-row"><input type="radio" name="meal" value="${esc(o)}" ${i===0 ? "required" : ""}> ${esc(o)}</label>`).join("");
+  const normalized = opts.map(o => typeof o === "string" ? {label:o, imageUrl:""} : {label:o.label || "", imageUrl:o.imageUrl || ""}).filter(o => o.label);
+  const hasImages = normalized.some(o => o.imageUrl);
+  if(hasImages){
+    return `<label>餐點 *</label><div class="image-choice-grid meal-choice-grid">` + normalized.map((o,i)=>`
+      <label class="image-choice-card">
+        <input type="radio" name="meal" value="${esc(o.label)}" ${i===0 ? "required" : ""}>
+        ${o.imageUrl ? `<img src="${esc(o.imageUrl)}" alt="${esc(o.label)}">` : ""}
+        <span>${esc(o.label)}</span>
+      </label>`).join("") + `</div>`;
+  }
+  return `<label>餐點 *</label>` + normalized.map((o,i)=>`<label class="radio-row"><input type="radio" name="meal" value="${esc(o.label)}" ${i===0 ? "required" : ""}> ${esc(o.label)}</label>`).join("");
 }
 
 function fieldHtml(f, i){
