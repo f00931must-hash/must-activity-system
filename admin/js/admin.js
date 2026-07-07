@@ -639,7 +639,7 @@ async function viewRegistrations(id){
   const custom = a.registerFields || [];
   const table = rows.length ? `<table class="data-table">
     <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th><th>餐點</th>${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
+    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
   $("modal")?.classList.remove("hidden");
@@ -788,7 +788,7 @@ async function viewFeedbacks(id){
   const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
   const qs = a.feedbackQuestions || [];
   const textQs = a.feedbackTextQuestions || [];
-  const table = rows.length ? `<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}${textQs.map(q=>`<th>${esc(q.label)}</th>`).join("")}<th>心得</th><th>操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}${textQs.map(q=>`<td>${esc(r.textAnswers?.[q.label]||"")}</td>`).join("")}<td>${esc(r.comment||"")}</td><td><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有人填寫回饋</div>';
+  const table = rows.length ? `<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}${textQs.map(q=>`<th>${esc(q.label)}</th>`).join("")}<th>心得</th><th>操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}${textQs.map(q=>`<td>${esc(r.textAnswers?.[q.label]||"")}</td>`).join("")}<td>${esc(r.comment||"")}</td><td><button class="ghost-btn" data-edit-fb="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有人填寫回饋</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜回饋資料 <span class="quick-count">${rows.length} 份</span></h2>${table}<p><button class="primary-btn" data-export-fbs="${id}">下載回饋資料</button></p>`);
   $("modal")?.classList.remove("hidden");
 }
@@ -1032,6 +1032,12 @@ document.addEventListener("click", async (e) => {
 
   const copyAct = e.target.closest("[data-copy-activity]");
   if(copyAct) return copyActivity(copyAct.dataset.copyActivity);
+
+  const editReg = e.target.closest("[data-edit-reg]");
+  if(editReg) return editRegistration(editReg.dataset.editReg, editReg.dataset.student);
+
+  const editFb = e.target.closest("[data-edit-fb]");
+  if(editFb) return editFeedback(editFb.dataset.editFb, editFb.dataset.student);
 
   const delReg = e.target.closest("[data-delete-reg]");
   if(delReg) return deleteRegistration(delReg.dataset.deleteReg, delReg.dataset.student);

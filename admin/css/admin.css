@@ -149,3 +149,8 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
 .meal-paste-zone:focus,.meal-paste-zone.drag-over{border-color:#38bdf8;background:#ecfeff}
 .meal-option-preview{width:100%;max-height:160px;border-radius:12px;object-fit:cover}
 .meal-option-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+.edit-data-form{display:flex;flex-direction:column;gap:10px}
+.edit-data-form textarea.field{min-height:90px}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.data-table td .ghost-btn{margin:2px}
