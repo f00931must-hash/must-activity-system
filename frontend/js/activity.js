@@ -19,6 +19,17 @@ async function init(){
   renderForm();
 }
 
+function fixedFields(){
+  const f = activity.fixedFields || {};
+  return {
+    studentId: f.studentId !== false,
+    department: f.department !== false,
+    phone: f.phone !== false,
+    biologicalSex: f.biologicalSex !== false,
+    meal: activity.enableMeal !== false
+  };
+}
+
 function renderHeader(){
   $("activityHeader").innerHTML = `
     <div class="status-tags"><span class="badge">${esc(activity.status || "活動")}</span>${tagHtml(activity.tags || [])}</div>
@@ -33,16 +44,20 @@ function renderHeader(){
 function renderForm(){
   const cap = Number(activity.capacity || 0);
   const reg = Number(activity.registeredCount || 0);
-  const now = Date.now();
   const openAt = parseLocalTime(activity.registerOpenAt);
   const closeAt = parseLocalTime(activity.registerCloseAt);
-  if((openAt && now < openAt) || (closeAt && now > closeAt)){
-    $("registerPanel").innerHTML = '<div class="empty">目前未開放報名。</div>';
-    return;
-  }
+  const now = Date.now();
 
   if(activity.status !== "open"){
     $("registerPanel").innerHTML = '<div class="empty">目前未開放報名。</div>';
+    return;
+  }
+  if(openAt && now < openAt){
+    $("registerPanel").innerHTML = '<div class="empty">報名尚未開始。</div>';
+    return;
+  }
+  if(closeAt && now > closeAt){
+    $("registerPanel").innerHTML = '<div class="empty">報名已截止。</div>';
     return;
   }
   if(cap > 0 && reg >= cap){
@@ -50,23 +65,29 @@ function renderForm(){
     return;
   }
 
+  const ff = fixedFields();
   $("registerPanel").innerHTML = `
     <h2>我要報名</h2>
     <form id="regForm">
       <label>姓名 *</label><input class="field" name="name" required>
-      <label>系級 *</label><input class="field" name="department" required>
-      <label>學號 *</label><input class="field" name="studentId" required>
-      <label>電話 *</label><input class="field" name="phone" required>
-      <label>餐點 *</label>
-      <label class="radio-row"><input type="radio" name="meal" value="葷" required> 葷</label>
-      <label class="radio-row"><input type="radio" name="meal" value="素"> 素</label>
-      <label class="radio-row"><input type="radio" name="meal" value="不用餐"> 不用餐</label>
+      ${ff.studentId ? `<label>學號／職員編號 *</label><input class="field" name="studentId" required>` : ""}
+      ${ff.department ? `<label>單位／班級 <span class="hint-inline">（例如：旅廚二甲、資源教室）</span> *</label><input class="field" name="department" required>` : ""}
+      ${ff.phone ? `<label>聯絡電話 *</label><input class="field" name="phone" required>` : ""}
+      ${ff.biologicalSex ? `<label>生理性別 *</label>
+        <label class="radio-row"><input type="radio" name="biologicalSex" value="男" required> 男</label>
+        <label class="radio-row"><input type="radio" name="biologicalSex" value="女"> 女</label>` : ""}
+      ${ff.meal ? mealHtml() : ""}
       ${(activity.registerFields || []).map(fieldHtml).join("")}
       <div id="msg"></div>
       <button class="primary-btn" type="submit">送出報名</button>
     </form>
   `;
   $("regForm").addEventListener("submit", submitForm);
+}
+
+function mealHtml(){
+  const opts = (activity.mealOptions && activity.mealOptions.length) ? activity.mealOptions : ["葷","素","不用餐"];
+  return `<label>餐點 *</label>` + opts.map((o,i)=>`<label class="radio-row"><input type="radio" name="meal" value="${esc(o)}" ${i===0 ? "required" : ""}> ${esc(o)}</label>`).join("");
 }
 
 function fieldHtml(f, i){
@@ -95,9 +116,10 @@ function fieldHtml(f, i){
 async function submitForm(e){
   e.preventDefault();
   const fd = new FormData(e.target);
-  const studentIdKey = String(fd.get("studentId") || "").trim().toUpperCase();
-  if(!studentIdKey){
-    $("msg").innerHTML = '<div class="error">請填寫學號。</div>';
+  const ff = fixedFields();
+  const studentIdKey = ff.studentId ? String(fd.get("studentId") || "").trim().toUpperCase() : ("NOID_" + Date.now());
+  if(ff.studentId && !studentIdKey){
+    $("msg").innerHTML = '<div class="error">請填寫學號／職員編號。</div>';
     return;
   }
 
@@ -107,17 +129,18 @@ async function submitForm(e){
   const regRef = doc(db, "activities", id, "registrations", studentIdKey);
   const existing = await getDoc(regRef);
   if(existing.exists()){
-    $("msg").innerHTML = '<div class="error">這個學號已經報名過了。</div>';
+    $("msg").innerHTML = '<div class="error">這個學號／職員編號已經報名過了。</div>';
     return;
   }
 
   try{
     await setDoc(regRef, {
       name: fd.get("name"),
-      department: fd.get("department"),
-      studentId: studentIdKey,
-      phone: fd.get("phone"),
-      meal: fd.get("meal"),
+      studentId: ff.studentId ? studentIdKey : "",
+      department: ff.department ? fd.get("department") : "",
+      phone: ff.phone ? fd.get("phone") : "",
+      biologicalSex: ff.biologicalSex ? fd.get("biologicalSex") : "",
+      meal: ff.meal ? fd.get("meal") : "",
       customAnswers,
       createdAt: serverTimestamp()
     });
@@ -129,17 +152,17 @@ async function submitForm(e){
   }
 }
 
-function parseLocalTime(value){
-  if(!value) return null;
-  const t = new Date(String(value)).getTime();
-  return Number.isNaN(t) ? null : t;
-}
-
 function attachmentHtml(files){
   if(!files || !files.length) return "";
   return `<div class="attachment-list compact-attachments">
-    ${files.map((f,i) => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 附件${files.length > 1 ? i+1 : ""}</a>`).join("")}
+    ${files.map((f,i) => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 ${esc(f.name || ("附件" + (files.length > 1 ? i+1 : "")))}</a>`).join("")}
   </div>`;
+}
+
+function parseLocalTime(value){
+  if(!value) return null;
+  const t = new Date(value).getTime();
+  return Number.isNaN(t) ? null : t;
 }
 
 function tagColorClass(tag){
@@ -148,10 +171,10 @@ function tagColorClass(tag){
   String(tag || "").split("").forEach(ch => sum += ch.charCodeAt(0));
   return classes[sum % classes.length];
 }
-
 function tagHtml(tags){
-  if(!tags || !tags.length) return "";
-  return `<div class="tag-row">${tags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
+  const uniqueTags = [...new Set((tags || []).filter(Boolean))];
+  if(!uniqueTags.length) return "";
+  return `<div class="tag-row">${uniqueTags.map(t => `<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`;
 }
 
 function esc(str){

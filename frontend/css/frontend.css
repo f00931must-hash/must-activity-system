@@ -30,3 +30,5 @@
 .image-choice-card span{font-weight:700;text-align:center}
 .compact-attachments{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
 .compact-attachments a{display:inline-flex;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid #dbeafe;border-radius:999px;padding:6px 10px;text-decoration:none;background:#f8fbff}
+
+.hint-inline{font-size:13px;color:#64748b;font-weight:400}

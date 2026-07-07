@@ -15,6 +15,7 @@ let regFields = [];
 let fbQuestions = [];
 let feedbackTextQuestions = [];
 let attachments = [];
+let mealOptions = ["葷","素","不用餐"];
 let adminSearchText = "";
 let unsubscribe = null;
 
@@ -147,6 +148,13 @@ function resetForm(){
   setVal("capacity", 0);
   setVal("status", "open");
   setChecked("published", true);
+  setChecked("showStudentId", true);
+  setChecked("showDepartment", true);
+  setChecked("showPhone", true);
+  setChecked("showBiologicalSex", true);
+  setChecked("enableMeal", true);
+  mealOptions = ["葷","素","不用餐"];
+  renderMealOptions();
   setVal("registerOpenAt", "");
   setVal("registerCloseAt", "");
   setVal("feedbackOpenAt", "");
@@ -178,6 +186,14 @@ function editActivity(id){
   setVal("capacity", a.capacity || 0);
   setVal("status", a.status || "open");
   setChecked("published", a.published !== false);
+  const fixed = a.fixedFields || {};
+  setChecked("showStudentId", fixed.studentId !== false);
+  setChecked("showDepartment", fixed.department !== false);
+  setChecked("showPhone", fixed.phone !== false);
+  setChecked("showBiologicalSex", fixed.biologicalSex !== false);
+  setChecked("enableMeal", a.enableMeal !== false);
+  mealOptions = a.mealOptions || ["葷","素","不用餐"];
+  renderMealOptions();
   setVal("registerOpenAt", a.registerOpenAt || "");
   setVal("registerCloseAt", a.registerCloseAt || "");
   setVal("feedbackOpenAt", a.feedbackOpenAt || "");
@@ -209,6 +225,14 @@ function copyActivity(id){
   setVal("capacity", a.capacity || 0);
   setVal("status", "draft");
   setChecked("published", false);
+  const copyFixed = a.fixedFields || {};
+  setChecked("showStudentId", copyFixed.studentId !== false);
+  setChecked("showDepartment", copyFixed.department !== false);
+  setChecked("showPhone", copyFixed.phone !== false);
+  setChecked("showBiologicalSex", copyFixed.biologicalSex !== false);
+  setChecked("enableMeal", a.enableMeal !== false);
+  mealOptions = a.mealOptions || ["葷","素","不用餐"];
+  renderMealOptions();
   setVal("registerOpenAt", a.registerOpenAt || "");
   setVal("registerCloseAt", a.registerCloseAt || "");
   setVal("feedbackOpenAt", a.feedbackOpenAt || "");
@@ -219,6 +243,17 @@ function copyActivity(id){
   feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
   attachments = JSON.parse(JSON.stringify(a.attachments || []));
   renderAttachments(); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
+}
+
+function renderMealOptions(){
+  const box = $("mealOptionsBox");
+  if(!box) return;
+  box.innerHTML = mealOptions.length ? mealOptions.map((m,i)=>`
+    <div class="field-row meal-option-row">
+      <input class="field meal-option-input" data-i="${i}" value="${esc(m)}" placeholder="例如：雞腿、素食、不用餐">
+      <button type="button" class="ghost-btn danger-btn meal-option-remove" data-i="${i}">移除</button>
+    </div>`).join("") : '<div class="empty">目前沒有餐點選項。</div>';
+  bindFieldEvents();
 }
 
 function renderAttachments(){
@@ -451,6 +486,8 @@ async function handleImageOptionPaste(event){
 }
 
 function bindFieldEvents(){
+  document.querySelectorAll(".meal-option-input").forEach(el => el.oninput = () => mealOptions[Number(el.dataset.i)] = el.value);
+  document.querySelectorAll(".meal-option-remove").forEach(el => el.onclick = () => { mealOptions.splice(Number(el.dataset.i),1); renderMealOptions(); });
   document.querySelectorAll(".reg-label").forEach(el => el.oninput = () => regFields[Number(el.dataset.i)].label = el.value);
   document.querySelectorAll(".reg-type").forEach(el => el.onchange = () => {
     const i = Number(el.dataset.i);
@@ -531,6 +568,14 @@ async function saveActivity(event){
     capacity: Number(val("capacity") || 0),
     status: val("status") || "open",
     published: checked("published"),
+    fixedFields: {
+      studentId: checked("showStudentId"),
+      department: checked("showDepartment"),
+      phone: checked("showPhone"),
+      biologicalSex: checked("showBiologicalSex")
+    },
+    enableMeal: checked("enableMeal"),
+    mealOptions: mealOptions.filter(Boolean),
     registerOpenAt: val("registerOpenAt"),
     registerCloseAt: val("registerCloseAt"),
     feedbackOpenAt: val("feedbackOpenAt"),
@@ -593,8 +638,8 @@ async function viewRegistrations(id){
   const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
   const custom = a.registerFields || [];
   const table = rows.length ? `<table class="data-table">
-    <thead><tr><th>#</th><th>姓名</th><th>系級</th><th>學號</th><th>電話</th><th>餐點</th>${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
+    <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th><th>餐點</th>${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
   $("modal")?.classList.remove("hidden");
@@ -680,11 +725,17 @@ async function exportRegistrations(id){
   }
 
   // 1cm 約 37.8px；Word width 屬性用 px 近似。
-  // 姓名 2.1cm、簽到 2.1cm、系級/班級 3cm、性別 2.1cm。
+  // 姓名 2.1cm、簽到 2.1cm、單位／班級 3cm、性別 2.1cm。
   const wName = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wSign = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
   const wDept = 'style="width:3cm;mso-width-source:userset;mso-width-alt:1701" width="113"';
   const wGender = 'style="width:2.3cm;mso-width-source:userset;mso-width-alt:1304;text-align:center;white-space:nowrap" width="87"';
+
+  function genderMark(gender){
+    if(gender === "男") return "■男 □女";
+    if(gender === "女") return "□男 ■女";
+    return "□男 □女";
+  }
 
   function block(r){
     if(!r){
@@ -721,8 +772,8 @@ async function exportRegistrations(id){
         <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="87" style="width:2.3cm">
       </colgroup>
       <tr style="height:0.92cm">
-        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>系級/班級</th><th class="gender-cell" ${wGender}>性別</th>
-        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>系級/班級</th><th class="gender-cell" ${wGender}>性別</th>
+        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>單位／班級</th><th class="gender-cell" ${wGender}>生理性別</th>
+        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>單位／班級</th><th class="gender-cell" ${wGender}>生理性別</th>
       </tr>
       ${bodyRows}
     </table>
@@ -917,6 +968,7 @@ bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").t
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("newActivityBtn", (e) => { e.preventDefault(); showView("activities"); resetForm(); });
 bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
+bindClick("addMealOptionBtn", e => { e.preventDefault(); mealOptions.push(""); renderMealOptions(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
 bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
