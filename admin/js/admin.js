@@ -741,7 +741,7 @@ async function exportRegistrations(id){
     if(!r){
       return `<td class="name-cell" ${wName}></td><td class="sign-cell" ${wSign}></td><td class="dept-cell" ${wDept}></td><td class="gender-cell" ${wGender}>□男 □女</td>`;
     }
-    return `<td class="name-cell" ${wName}>${esc(r.name || "")}</td><td class="sign-cell" ${wSign}></td><td class="dept-cell" ${wDept}>${esc(r.department || "")}</td><td class="gender-cell" ${wGender}>□男 □女</td>`;
+    return `<td class="name-cell" ${wName}>${esc(r.name || "")}</td><td class="sign-cell" ${wSign}></td><td class="dept-cell" ${wDept}>${esc(r.department || "")}</td><td class="gender-cell" ${wGender}>${genderMark(r.biologicalSex || "")}</td>`;
   }
 
   const bodyRows = pairedRows.map(pair=>`<tr style="height:0.92cm">${block(pair[0])}${block(pair[1])}</tr>`).join("");

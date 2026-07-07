@@ -1,4 +1,4 @@
-# MUST Activity System v2.6.4 Final
+# MUST Activity System v2.6.5 Final
 
 活動報名與回饋管理平台。
 
@@ -233,3 +233,7 @@
 
 ## v2.6.4 Final
 - 修正修改報名/回饋資料時 editRegistration、editFeedback 未定義的問題。
+
+## v2.6.5 Final
+- 修正簽到表生理性別未依報名資料自動帶入的問題。
+- 男性顯示 ■男 □女，女性顯示 □男 ■女。
