@@ -138,3 +138,7 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
 .image-option-preview{width:100%;max-height:180px;border-radius:12px;object-fit:cover}
 .image-option-actions{display:flex;gap:6px;flex-wrap:wrap}
 .hidden-file{display:none}
+
+.fixed-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;margin:8px 0 16px}
+.check-row.disabled{opacity:.75}
+.meal-option-row{grid-template-columns:1fr auto}
