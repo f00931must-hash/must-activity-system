@@ -17,6 +17,8 @@ let feedbackTextQuestions = [];
 let attachments = [];
 let mealOptions = ["葷","素","不用餐"];
 let adminSearchText = "";
+let latestStatsRows = [];
+let latestFileRows = [];
 let unsubscribe = null;
 
 const defaultFb = [];
@@ -72,7 +74,8 @@ function showView(view){
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + view)?.classList.remove("hidden");
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",settings:"系統設定"}[view] || "管理平台");
+  if(view === "files") setTimeout(refreshFiles, 50);
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -1080,6 +1083,262 @@ function tagHtml(tags){
 
 function esc(str){ return String(str || "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 
+
+function selectedStatItems(){
+  return [...document.querySelectorAll(".stat-item:checked")].map(el => el.value);
+}
+
+function activityInStatRange(a, mode, year, start, end){
+  if(mode === "year"){
+    return String(a.academicYear || "") === String(year || "").trim();
+  }
+  const d = String(a.date || "");
+  if(start && d < start) return false;
+  if(end && d > end) return false;
+  return true;
+}
+
+async function collectActivityDetails(activityList){
+  const details = [];
+  for(const a of activityList){
+    const regsSnap = await getDocs(collection(db, "activities", a.id, "registrations"));
+    const fbsSnap = await getDocs(collection(db, "activities", a.id, "feedbacks"));
+    details.push({
+      activity: a,
+      registrations: regsSnap.docs.map(d => ({docId:d.id, ...d.data()})),
+      feedbacks: fbsSnap.docs.map(d => ({docId:d.id, ...d.data()}))
+    });
+  }
+  return details;
+}
+
+function countBy(rows, getter){
+  const out = {};
+  rows.forEach(r => {
+    const key = getter(r) || "未填";
+    out[key] = (out[key] || 0) + 1;
+  });
+  return out;
+}
+
+function statTable(title, obj){
+  const entries = Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length) return `<section class="stat-section"><h3>${esc(title)}</h3><div class="empty">沒有資料</div></section>`;
+  const total = entries.reduce((s,[,v])=>s+v,0) || 1;
+  return `<section class="stat-section"><h3>${esc(title)}</h3><table class="data-table"><thead><tr><th>項目</th><th>數量</th><th>比例</th></tr></thead><tbody>
+    ${entries.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td><td>${Math.round(v/total*1000)/10}%</td></tr>`).join("")}
+  </tbody></table></section>`;
+}
+
+async function runStatistics(){
+  const mode = val("statMode");
+  const year = val("statYear");
+  const start = val("statStart");
+  const end = val("statEnd");
+  const items = selectedStatItems();
+  const includeDraft = checked("includeDraftStats");
+  const includeClosed = checked("includeClosedStats");
+  const includeEmpty = checked("includeEmptyStats");
+
+  if(mode === "year" && !year){
+    alert("請輸入學年度，例如：115");
+    return;
+  }
+  if(mode === "range" && !start && !end){
+    alert("請至少選擇開始日期或結束日期。");
+    return;
+  }
+
+  setHtml("statsResult", '<div class="empty">統計中...</div>');
+
+  let picked = activities.filter(a => activityInStatRange(a, mode, year, start, end));
+  if(!includeDraft) picked = picked.filter(a => a.published !== false);
+  if(!includeClosed) picked = picked.filter(a => a.status !== "closed");
+  if(!includeEmpty) picked = picked.filter(a => Number(a.registeredCount || 0) > 0);
+
+  const details = await collectActivityDetails(picked);
+  const allRegs = details.flatMap(d => d.registrations.map(r => ({...r, activity:d.activity})));
+  const allFbs = details.flatMap(d => d.feedbacks.map(r => ({...r, activity:d.activity})));
+
+  const totalActivities = details.length;
+  const totalRegs = allRegs.length;
+  const uniquePeople = new Set(allRegs.map(r => r.studentId || r.docId || r.name).filter(Boolean)).size;
+  const totalFeedbacks = allFbs.length;
+
+  latestStatsRows = [
+    ["統計範圍", mode === "year" ? `學年度 ${year}` : `${start || "不限"} 至 ${end || "不限"}`],
+    ["活動數", totalActivities],
+    ["報名人次", totalRegs],
+    ["不重複人數", uniquePeople],
+    ["回饋份數", totalFeedbacks]
+  ];
+
+  let html = `<div class="stats summary-cards">
+    <div class="stat-card"><span>活動數</span><strong>${totalActivities}</strong></div>
+    <div class="stat-card"><span>報名人次</span><strong>${totalRegs}</strong></div>
+    <div class="stat-card"><span>不重複人數</span><strong>${uniquePeople}</strong></div>
+    <div class="stat-card"><span>回饋份數</span><strong>${totalFeedbacks}</strong></div>
+  </div>`;
+
+  if(items.includes("activityList")){
+    html += `<section class="stat-section"><h3>活動清單</h3><table class="data-table"><thead><tr><th>學年度</th><th>學期</th><th>日期</th><th>活動</th><th>標籤</th><th>報名</th><th>回饋</th></tr></thead><tbody>
+      ${details.map(d => `<tr><td>${esc(d.activity.academicYear || "")}</td><td>${esc(d.activity.semester || "")}</td><td>${esc(d.activity.date || "")}</td><td>${esc(d.activity.title || "")}</td><td>${esc((d.activity.tags || []).join("、"))}</td><td>${d.registrations.length}</td><td>${d.feedbacks.length}</td></tr>`).join("")}
+    </tbody></table></section>`;
+    latestStatsRows.push(["活動清單"]);
+    details.forEach(d => latestStatsRows.push([d.activity.academicYear||"", d.activity.semester||"", d.activity.date||"", d.activity.title||"", (d.activity.tags||[]).join("、"), d.registrations.length, d.feedbacks.length]));
+  }
+
+  if(items.includes("sex")){
+    const data = countBy(allRegs, r => r.biologicalSex);
+    html += statTable("生理性別統計", data);
+    latestStatsRows.push(["生理性別統計"], ...Object.entries(data));
+  }
+
+  if(items.includes("unit")){
+    const data = countBy(allRegs, r => r.department);
+    html += statTable("單位／班級統計", data);
+    latestStatsRows.push(["單位／班級統計"], ...Object.entries(data));
+  }
+
+  if(items.includes("tags")){
+    const tagRows = [];
+    details.forEach(d => (d.activity.tags || ["未標籤"]).forEach(t => tagRows.push(t || "未標籤")));
+    const data = countBy(tagRows, x => x);
+    html += statTable("活動標籤統計", data);
+    latestStatsRows.push(["活動標籤統計"], ...Object.entries(data));
+  }
+
+  if(items.includes("meal")){
+    const data = countBy(allRegs, r => r.meal);
+    html += statTable("餐點統計", data);
+    latestStatsRows.push(["餐點統計"], ...Object.entries(data));
+  }
+
+  if(items.includes("custom")){
+    const customCounts = {};
+    allRegs.forEach(r => {
+      Object.entries(r.customAnswers || {}).forEach(([q,a]) => {
+        if(!customCounts[q]) customCounts[q] = {};
+        const key = a || "未填";
+        customCounts[q][key] = (customCounts[q][key] || 0) + 1;
+      });
+    });
+    Object.entries(customCounts).forEach(([q,obj]) => {
+      html += statTable(`自訂題：${q}`, obj);
+      latestStatsRows.push([`自訂題：${q}`], ...Object.entries(obj));
+    });
+  }
+
+  if(items.includes("feedback")){
+    const scoreMap = {"非常滿意":5,"滿意":4,"普通":3,"不滿意":2,"非常不滿意":1};
+    const ratingAgg = {};
+    allFbs.forEach(r => {
+      Object.entries(r.ratings || {}).forEach(([q,a]) => {
+        if(!ratingAgg[q]) ratingAgg[q] = {sum:0,count:0,dist:{}};
+        ratingAgg[q].sum += scoreMap[a] || 0;
+        ratingAgg[q].count += scoreMap[a] ? 1 : 0;
+        ratingAgg[q].dist[a || "未填"] = (ratingAgg[q].dist[a || "未填"] || 0) + 1;
+      });
+    });
+    Object.entries(ratingAgg).forEach(([q,info]) => {
+      const avg = info.count ? Math.round(info.sum/info.count*100)/100 : 0;
+      html += `<section class="stat-section"><h3>回饋滿意度：${esc(q)} <span class="quick-count">平均 ${avg}</span></h3></section>`;
+      html += statTable(q, info.dist);
+      latestStatsRows.push([`回饋滿意度：${q}`, `平均 ${avg}`], ...Object.entries(info.dist));
+    });
+  }
+
+  if(items.includes("overview") && totalActivities === 0){
+    html += '<div class="empty">此範圍內沒有活動。</div>';
+  }
+
+  setHtml("statsResult", html);
+}
+
+function downloadStatsCsv(){
+  if(!latestStatsRows.length){
+    alert("請先產生統計。");
+    return;
+  }
+  downloadCsv("活動統計.csv", latestStatsRows);
+}
+
+function collectFilesFromActivities(){
+  const rows = [];
+  activities.forEach(a => {
+    (a.attachments || []).forEach((f,i) => rows.push({activityId:a.id, activityTitle:a.title, source:"attachments", index:i, name:f.name || `附件${i+1}`, url:f.url || "", path:f.path || ""}));
+    (a.registerFields || []).forEach((field,fi) => {
+      (field.imageOptions || []).forEach((o,oi) => {
+        if(o.imageUrl) rows.push({activityId:a.id, activityTitle:a.title, source:"registerImage", fieldIndex:fi, optionIndex:oi, name:`${field.label || "圖片選項"}-${o.label || oi+1}`, url:o.imageUrl, path:o.imagePath || ""});
+      });
+    });
+    (a.mealOptions || []).forEach((o,i) => {
+      const item = typeof o === "string" ? {label:o} : o;
+      if(item.imageUrl) rows.push({activityId:a.id, activityTitle:a.title, source:"mealImage", index:i, name:`餐點-${item.label || i+1}`, url:item.imageUrl, path:item.imagePath || ""});
+    });
+  });
+  return rows;
+}
+
+async function refreshFiles(){
+  latestFileRows = collectFilesFromActivities();
+  setText("fileCount", latestFileRows.length);
+  setText("fileSize", "估算中...");
+  let knownTotal = 0;
+  let knownCount = 0;
+  for(const f of latestFileRows){
+    if(f.size){ knownTotal += Number(f.size); knownCount++; continue; }
+  }
+  setText("fileSize", knownCount ? formatBytes(knownTotal) : "GitHub連結無法精準估算");
+  renderFileList();
+}
+
+function renderFileList(){
+  const html = latestFileRows.length ? `<table class="data-table"><thead><tr><th>活動</th><th>來源</th><th>檔名</th><th>連結</th><th>操作</th></tr></thead><tbody>
+    ${latestFileRows.map((f,i)=>`<tr><td>${esc(f.activityTitle)}</td><td>${esc(fileSourceName(f.source))}</td><td>${esc(f.name)}</td><td><a href="${esc(f.url)}" target="_blank">開啟</a></td><td><button class="ghost-btn danger-btn" data-delete-file="${i}">刪除</button></td></tr>`).join("")}
+  </tbody></table>` : '<div class="empty">目前沒有附件或圖片。</div>';
+  setHtml("fileList", html);
+}
+
+function fileSourceName(source){
+  return {attachments:"活動附件",registerImage:"報名圖片選項",mealImage:"餐點圖片"}[source] || source;
+}
+
+function formatBytes(bytes){
+  if(!bytes) return "0 B";
+  const units = ["B","KB","MB","GB"];
+  let n = bytes, u = 0;
+  while(n >= 1024 && u < units.length-1){ n/=1024; u++; }
+  return `${Math.round(n*10)/10} ${units[u]}`;
+}
+
+async function deleteManagedFile(index){
+  const f = latestFileRows[index];
+  if(!f) return;
+  if(!confirm(`確定刪除「${f.name}」？\n系統會移除活動中的檔案連結。`)) return;
+  const a = activities.find(x => x.id === f.activityId);
+  if(!a) return alert("找不到活動資料。");
+
+  if(f.source === "attachments"){
+    const arr = [...(a.attachments || [])];
+    arr.splice(f.index,1);
+    await updateDoc(doc(db,"activities",a.id), {attachments: arr});
+  }else if(f.source === "registerImage"){
+    const fields = [...(a.registerFields || [])];
+    const opts = [...(fields[f.fieldIndex].imageOptions || [])];
+    opts[f.optionIndex] = {...opts[f.optionIndex], imageUrl:"", imageName:"", imagePath:""};
+    fields[f.fieldIndex] = {...fields[f.fieldIndex], imageOptions: opts};
+    await updateDoc(doc(db,"activities",a.id), {registerFields: fields});
+  }else if(f.source === "mealImage"){
+    const meals = [...(a.mealOptions || [])].map(o => typeof o === "string" ? {label:o, imageUrl:""} : {...o});
+    meals[f.index] = {...meals[f.index], imageUrl:"", imageName:"", imagePath:""};
+    await updateDoc(doc(db,"activities",a.id), {mealOptions: meals});
+  }
+
+  alert("已移除檔案連結。若 GitHub 仍保留實體檔，可之後再手動清理。");
+  setTimeout(refreshFiles, 500);
+}
+
 function bindClick(id, handler){
   const el = $(id);
   if(el) el.addEventListener("click", handler);
@@ -1100,6 +1359,9 @@ bindClick("saveGithubTokenBtn", e => {
 });
 bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
+bindClick("runStatsBtn", e=>{e.preventDefault(); runStatistics();});
+bindClick("downloadStatsCsvBtn", e=>{e.preventDefault(); downloadStatsCsv();});
+bindClick("refreshFilesBtn", e=>{e.preventDefault(); refreshFiles();});
 bindClick("newActivityBtn", (e) => { e.preventDefault(); showView("activities"); resetForm(); });
 bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addMealOptionBtn", e => { e.preventDefault(); mealOptions.push(""); renderMealOptions(); });
@@ -1178,6 +1440,9 @@ document.addEventListener("click", async (e) => {
 
   const delFb = e.target.closest("[data-delete-fb]");
   if(delFb) return deleteFeedback(delFb.dataset.deleteFb, delFb.dataset.student);
+
+  const delFile = e.target.closest("[data-delete-file]");
+  if(delFile) return deleteManagedFile(Number(delFile.dataset.deleteFile));
 
   const remTag=e.target.closest("[data-remove-tag]");
   if(remTag){ systemTags=systemTags.filter(t=>t!==remTag.dataset.removeTag); await saveTags(); return; }
