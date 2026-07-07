@@ -792,6 +792,140 @@ async function viewFeedbacks(id){
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜回饋資料 <span class="quick-count">${rows.length} 份</span></h2>${table}<p><button class="primary-btn" data-export-fbs="${id}">下載回饋資料</button></p>`);
   $("modal")?.classList.remove("hidden");
 }
+
+async function editRegistration(activityId, studentId){
+  const a = activities.find(x=>x.id===activityId);
+  if(!a) return alert("找不到活動資料。");
+  const snap = await getDoc(doc(db, "activities", activityId, "registrations", studentId));
+  if(!snap.exists()) return alert("找不到這筆報名資料。");
+  const r = snap.data();
+  const custom = a.registerFields || [];
+
+  const customRows = custom.map(f => {
+    const v = r.customAnswers?.[f.label] || "";
+    if(f.type === "textarea"){
+      return `<label>${esc(f.label)}</label><textarea class="field edit-reg-custom" data-label="${esc(f.label)}">${esc(v)}</textarea>`;
+    }
+    if(f.type === "radio" || f.type === "imageRadio"){
+      const opts = f.type === "imageRadio" ? (f.imageOptions || []).map(o=>o.label).filter(Boolean) : (f.options || []);
+      return `<label>${esc(f.label)}</label><select class="field edit-reg-custom" data-label="${esc(f.label)}">
+        <option value=""></option>
+        ${opts.map(o=>`<option value="${esc(o)}" ${v===o?"selected":""}>${esc(o)}</option>`).join("")}
+      </select>`;
+    }
+    return `<label>${esc(f.label)}</label><input class="field edit-reg-custom" data-label="${esc(f.label)}" value="${esc(v)}">`;
+  }).join("");
+
+  const mealOptions = (a.mealOptions || []).map(o => typeof o === "string" ? o : (o.label || "")).filter(Boolean);
+  const mealInput = mealOptions.length
+    ? `<select class="field" name="meal"><option value=""></option>${mealOptions.map(o=>`<option value="${esc(o)}" ${(r.meal||"")===o?"selected":""}>${esc(o)}</option>`).join("")}</select>`
+    : `<input class="field" name="meal" value="${esc(r.meal || "")}">`;
+
+  setHtml("modalContent", `
+    <button class="modal-close" data-modal-close type="button">×</button>
+    <h2>修改報名資料</h2>
+    <form id="editRegForm" class="edit-data-form">
+      <label>姓名</label><input class="field" name="name" value="${esc(r.name || "")}">
+      <label>單位／班級</label><input class="field" name="department" value="${esc(r.department || "")}">
+      <label>學號／職員編號</label><input class="field" name="studentId" value="${esc(r.studentId || "")}">
+      <label>聯絡電話</label><input class="field" name="phone" value="${esc(r.phone || "")}">
+      <label>生理性別</label>
+      <select class="field" name="biologicalSex">
+        <option value=""></option>
+        <option value="男" ${r.biologicalSex==="男"?"selected":""}>男</option>
+        <option value="女" ${r.biologicalSex==="女"?"selected":""}>女</option>
+      </select>
+      <label>餐點</label>${mealInput}
+      ${customRows}
+      <div class="modal-actions">
+        <button class="primary-btn" type="submit">儲存修改</button>
+        <button class="ghost-btn" type="button" data-view-regs="${activityId}">返回名單</button>
+      </div>
+    </form>
+  `);
+  $("modal")?.classList.remove("hidden");
+
+  $("editRegForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const customAnswers = {...(r.customAnswers || {})};
+    document.querySelectorAll(".edit-reg-custom").forEach(el => customAnswers[el.dataset.label] = el.value);
+    await updateDoc(doc(db, "activities", activityId, "registrations", studentId), {
+      name: fd.get("name") || "",
+      department: fd.get("department") || "",
+      studentId: fd.get("studentId") || "",
+      phone: fd.get("phone") || "",
+      biologicalSex: fd.get("biologicalSex") || "",
+      meal: fd.get("meal") || "",
+      customAnswers,
+      updatedAt: serverTimestamp()
+    });
+    alert("報名資料已修改。");
+    viewRegistrations(activityId);
+  });
+}
+
+async function editFeedback(activityId, studentId){
+  const a = activities.find(x=>x.id===activityId);
+  if(!a) return alert("找不到活動資料。");
+  const snap = await getDoc(doc(db, "activities", activityId, "feedbacks", studentId));
+  if(!snap.exists()) return alert("找不到這筆回饋資料。");
+  const r = snap.data();
+  const qs = a.feedbackQuestions || [];
+  const textQs = a.feedbackTextQuestions || [];
+  const likert = ["非常滿意","滿意","普通","不滿意","非常不滿意"];
+
+  const ratingRows = qs.map(q => {
+    const v = r.ratings?.[q] || "";
+    return `<label>${esc(q)}</label>
+      <select class="field edit-fb-rating" data-label="${esc(q)}">
+        <option value=""></option>
+        ${likert.map(o => `<option value="${o}" ${v===o?"selected":""}>${o}</option>`).join("")}
+      </select>`;
+  }).join("");
+
+  const textRows = textQs.map(q => {
+    const v = r.textAnswers?.[q.label] || "";
+    return `<label>${esc(q.label)}</label><textarea class="field edit-fb-text" data-label="${esc(q.label)}">${esc(v)}</textarea>`;
+  }).join("");
+
+  setHtml("modalContent", `
+    <button class="modal-close" data-modal-close type="button">×</button>
+    <h2>修改回饋資料</h2>
+    <form id="editFbForm" class="edit-data-form">
+      <label>姓名</label><input class="field" name="name" value="${esc(r.name || "")}">
+      <label>學號／職員編號</label><input class="field" name="studentId" value="${esc(r.studentId || "")}">
+      ${ratingRows}
+      ${textRows}
+      <label>心得</label><textarea class="field" name="comment">${esc(r.comment || "")}</textarea>
+      <div class="modal-actions">
+        <button class="primary-btn" type="submit">儲存修改</button>
+        <button class="ghost-btn" type="button" data-view-fbs="${activityId}">返回回饋資料</button>
+      </div>
+    </form>
+  `);
+  $("modal")?.classList.remove("hidden");
+
+  $("editFbForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const ratings = {...(r.ratings || {})};
+    document.querySelectorAll(".edit-fb-rating").forEach(el => ratings[el.dataset.label] = el.value);
+    const textAnswers = {...(r.textAnswers || {})};
+    document.querySelectorAll(".edit-fb-text").forEach(el => textAnswers[el.dataset.label] = el.value);
+    await updateDoc(doc(db, "activities", activityId, "feedbacks", studentId), {
+      name: fd.get("name") || "",
+      studentId: fd.get("studentId") || "",
+      ratings,
+      textAnswers,
+      comment: fd.get("comment") || "",
+      updatedAt: serverTimestamp()
+    });
+    alert("回饋資料已修改。");
+    viewFeedbacks(activityId);
+  });
+}
+
 async function deleteRegistration(activityId, studentId){
   if(!confirm("確定刪除此報名資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "registrations", studentId));
