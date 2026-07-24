@@ -60,15 +60,7 @@ async function loadAdmins(){
   renderAdmins();
 }
 
-function renderAdmins(){
-  const box = $("adminEmailList");
-  if(!box) return;
-  box.innerHTML = adminEmails.map(email => `
-    <div class="admin-email-item">
-      <strong>${esc(email)}</strong>
-      ${builtInAdmins.includes(email) ? "<span>內建</span>" : `<button class="ghost-btn" data-remove-admin="${esc(email)}">移除</button>`}
-    </div>
-  `).join("");
+function renderAdmins(){ /* 權限由 Portal 統一管理 */
 }
 
 function showView(view){
@@ -1531,15 +1523,6 @@ if(activityForm) activityForm.addEventListener("submit", saveActivity);
 const adminSearch = $("adminSearch");
 if(adminSearch) adminSearch.addEventListener("input", e => { adminSearchText = e.target.value.trim(); renderLists(); });
 
-const addAdminBtn = $("addAdminBtn");
-if(addAdminBtn) addAdminBtn.addEventListener("click", async () => {
-  const email = val("adminEmailInput").trim();
-  if(!email || !email.includes("@")) return alert("請輸入正確 Email");
-  if(!adminEmails.includes(email)) adminEmails.push(email);
-  await setDoc(doc(db, "settings", "admins"), { emails: adminEmails, updatedAt: serverTimestamp() }, { merge:true });
-  setVal("adminEmailInput", "");
-  renderAdmins();
-});
 
 document.addEventListener("click", async (e) => {
   if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
@@ -1601,12 +1584,6 @@ document.addEventListener("click", async (e) => {
   const remTag=e.target.closest("[data-remove-tag]");
   if(remTag){ systemTags=systemTags.filter(t=>t!==remTag.dataset.removeTag); await saveTags(); return; }
 
-  const removeAdmin = e.target.closest("[data-remove-admin]");
-  if(removeAdmin){
-    adminEmails = adminEmails.filter(x => x !== removeAdmin.dataset.removeAdmin);
-    await setDoc(doc(db, "settings", "admins"), {emails: adminEmails, updatedAt: serverTimestamp()}, {merge:true});
-    renderAdmins();
-  }
 });
 
 document.addEventListener("keydown", e => {

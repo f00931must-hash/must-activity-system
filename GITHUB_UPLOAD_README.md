@@ -1,17 +1,10 @@
-# GitHub 附件上傳說明
+# 活動系統 v3.1.0 上傳說明
 
-本系統不使用 Firebase Storage，附件會透過 GitHub Token 上傳到此 repo：
+將本資料夾全部檔案覆蓋上傳至原本的 `must-activity-system` GitHub Repository。
 
-- owner：f00931must-hash
-- repo：must-activity-system
-- path：uploads/activity-attachments/
+上傳後請回 Portal：
+1. 管理中心 → 老師管理。
+2. 按「同步活動權限」。
+3. 使用有權限與無權限的帳號各測試一次活動後台。
 
-## 使用方式
-
-1. 到 GitHub 建立 Fine-grained token 或 classic token。
-2. 權限至少需要 Contents: Read and Write。
-3. 到系統後台 → 系統設定 → GitHub 附件上傳設定。
-4. 貼上 token 後按「儲存 Token」。
-5. 回到活動管理，上傳圖片、PDF、Word、PPT。
-
-Token 只存在目前這台電腦的瀏覽器 localStorage，不會寫進 Firestore。
+活動系統內原本的老師新增功能已移除，權限改由 Portal 統一同步。
