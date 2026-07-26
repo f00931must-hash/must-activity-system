@@ -13,5 +13,6 @@ export const builtInAdmins = [
 ];
 
 export const siteConfig = {
-  baseUrl: "https://f00931must-hash.github.io/must-activity-system/"
+  baseUrl: "https://f00931must-hash.github.io/must-activity-system/",
+  uploadServiceUrl: "https://must-free-upload-service.f00931-must.workers.dev"
 };

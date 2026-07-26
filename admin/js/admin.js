@@ -19,7 +19,6 @@ let mealOptions = ["葷","素","不用餐"];
 let adminSearchText = "";
 let latestStatsRows = [];
 let latestFileRows = [];
-const GITHUB_PAGES_LIMIT_BYTES = 1024 * 1024 * 1024; // 以 1GB 作為提醒基準
 let unsubscribe = null;
 
 const defaultFb = [];
@@ -266,70 +265,63 @@ function renderAttachments(){
   setHtml("attachmentsBox", html);
   bindFieldEvents();
 }
-function githubRepoInfo(){
-  // 依目前專案固定：f00931must-hash / must-activity-system
-  return {
-    owner: "f00931must-hash",
-    repo: "must-activity-system",
-    branch: "main",
-    folder: "uploads/activity-attachments"
-  };
-}
+const UPLOAD_SERVICE_URL = (siteConfig.uploadServiceUrl || "https://must-free-upload-service.f00931-must.workers.dev").replace(/\/$/, "");
 
-function getGithubToken(){
-  return localStorage.getItem("must_activity_github_token") || "";
-}
-
-function setGithubToken(token){
-  localStorage.setItem("must_activity_github_token", token || "");
-  renderGithubTokenStatus();
-}
-
-function renderGithubTokenStatus(){
-  const el = $("githubTokenStatus");
-  if(!el) return;
-  el.textContent = getGithubToken() ? "已設定 Token，可上傳附件。" : "尚未設定 Token。";
-}
-
-function arrayBufferToBase64(buffer){
-  let binary = "";
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  for(let i=0; i<bytes.length; i+=chunkSize){
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
-  }
-  return btoa(binary);
+async function uploadServiceRequest(path, options={}){
+  if(!currentUser) throw new Error("尚未登入，請重新登入後再試。");
+  const idToken = await currentUser.getIdToken(true);
+  const res = await fetch(`${UPLOAD_SERVICE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${idToken}`,
+      ...(options.headers || {})
+    }
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.ok === false) throw new Error(data.error || `上傳服務錯誤（${res.status}）`);
+  return data;
 }
 
 async function uploadFileToGithub(file, folder="activity-attachments"){
-  const token = getGithubToken();
-  if(!token){
-    throw new Error("尚未設定 GitHub Token，請先到系統設定貼上 Token。");
-  }
-  const info = githubRepoInfo();
-  const safeName = file.name.replace(/[^\u4e00-\u9fa5a-zA-Z0-9._-]/g, "_");
-  const path = `uploads/${folder}/${Date.now()}_${safeName}`;
-  const content = arrayBufferToBase64(await file.arrayBuffer());
+  const category = file.type.startsWith("image/") ? "images" : "attachments";
+  const form = new FormData();
+  form.append("file", file);
+  form.append("system", "activity");
+  form.append("category", category);
+  form.append("referenceId", val("editId") || "unassigned");
+  form.append("subfolder", folder);
+  const data = await uploadServiceRequest("/upload", {method:"POST", body:form});
+  return data.file;
+}
 
-  const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      message: `upload file: ${safeName}`,
-      content,
-      branch: info.branch
-    })
+function githubPathFromUrl(urlOrPath){
+  if(!urlOrPath) return "";
+  if(!/^https?:\/\//.test(urlOrPath)) return String(urlOrPath).replace(/^\/+/, "");
+  try{
+    const u = new URL(urlOrPath);
+    const uploadIndex = u.pathname.split("/").filter(Boolean).indexOf("uploads");
+    const parts = u.pathname.split("/").filter(Boolean);
+    if(uploadIndex !== -1) return parts.slice(uploadIndex).join("/");
+  }catch(e){}
+  return "";
+}
+
+async function githubGetFileInfo(path){
+  const cleanPath = githubPathFromUrl(path);
+  if(!cleanPath) throw new Error("找不到檔案路徑");
+  const data = await uploadServiceRequest(`/file-info?path=${encodeURIComponent(cleanPath)}`);
+  return data.file;
+}
+
+async function githubDeleteFile(path, name="file"){
+  const cleanPath = githubPathFromUrl(path);
+  if(!cleanPath) throw new Error("找不到檔案路徑");
+  await uploadServiceRequest("/delete", {
+    method:"POST",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({path:cleanPath, name})
   });
-
-  if(!res.ok){
-    const err = await res.json().catch(()=>({message:res.statusText}));
-    throw new Error(err.message || "GitHub upload failed");
-  }
-  return { name:file.name, url:`${siteConfig.baseUrl}${path}`, type:file.type || "", path, size:file.size || 0 };
+  return true;
 }
 
 async function uploadAttachment(){
@@ -361,7 +353,6 @@ async function uploadAttachment(){
     alert("附件已上傳到 GitHub。");
   }catch(err){
     console.error(err);
-    if(String(err.message).includes("Token")) showView("settings");
     alert("附件上傳失敗：" + err.message);
   }
 }
@@ -527,7 +518,6 @@ async function uploadImageOptionFile(fieldIndex, optionIndex, file){
     renderRegFields();
   }catch(err){
     console.error(err);
-    if(String(err.message).includes("Token")) showView("settings");
     alert("圖片上傳失敗：" + err.message);
   }
 }
@@ -1322,28 +1312,10 @@ function downloadStatsCsv(){
 }
 
 
+
 async function githubGetRepoUsage(){
-  const token = getGithubToken();
-  if(!token) throw new Error("尚未設定 GitHub Token");
-  const info = githubRepoInfo();
-  const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}`, {
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
-    }
-  });
-  if(!res.ok){
-    const err = await res.json().catch(()=>({message:res.statusText}));
-    throw new Error(err.message || "GitHub repo usage failed");
-  }
-  const data = await res.json();
-  const usedBytes = Number(data.size || 0) * 1024;
-  return {
-    usedBytes,
-    limitBytes: GITHUB_PAGES_LIMIT_BYTES,
-    remainingBytes: Math.max(GITHUB_PAGES_LIMIT_BYTES - usedBytes, 0),
-    percent: Math.round(usedBytes / GITHUB_PAGES_LIMIT_BYTES * 1000) / 10
-  };
+  const data = await uploadServiceRequest("/stats");
+  return data.usage;
 }
 
 function collectFilesFromActivities(){
@@ -1387,21 +1359,20 @@ async function refreshFiles(){
     setText("fileSize", `無法讀取 GitHub 容量：${err.message || "請確認 Token"}`);
   }
 
-  const token = getGithubToken();
   for(const f of latestFileRows){
     f.path = f.path || githubPathFromUrl(f.url || "");
     if(f.size) continue;
-    if(token && f.path){
+    if(f.path){
       try{
         const info = await githubGetFileInfo(f.path);
         f.size = info.size || 0;
         f.sha = info.sha || "";
       }catch(err){
-        console.warn("GitHub file size failed", f.path, err);
+        console.warn("檔案大小讀取失敗", f.path, err);
         f.error = err.message || "無法讀取";
       }
     }else{
-      f.error = token ? "缺少檔案路徑" : "未設定 Token";
+      f.error = "缺少檔案路徑";
     }
   }
 
@@ -1444,10 +1415,10 @@ async function deleteManagedFile(index){
   if(!a) return alert("找不到活動資料。");
 
   const path = f.path || githubPathFromUrl(f.url || "");
-  const deleteGithub = !!path && !!getGithubToken();
+  const deleteGithub = !!path;
   const msg = deleteGithub
-    ? `確定刪除「${f.name}」？\n會移除系統連結，並嘗試刪除 GitHub 實體檔案。`
-    : `確定刪除「${f.name}」？\n目前缺少 Token 或路徑，只會移除系統連結。`;
+    ? `確定刪除「${f.name}」？\n會移除系統連結，並透過共用服務刪除實體檔案。`
+    : `確定刪除「${f.name}」？\n目前缺少檔案路徑，只會移除系統連結。`;
   if(!confirm(msg)) return;
 
   let githubDeleted = false;
@@ -1497,12 +1468,6 @@ bindClick("loginBtn", async (e) => {
 });
 
 bindClick("logoutBtn", () => signOut(auth));
-bindClick("saveGithubTokenBtn", e => {
-  e.preventDefault();
-  setGithubToken(val("githubTokenInput").trim());
-  setVal("githubTokenInput", "");
-  alert("GitHub Token 已儲存在這台電腦的瀏覽器。");
-});
 bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("runStatsBtn", e=>{e.preventDefault(); runStatistics();});
