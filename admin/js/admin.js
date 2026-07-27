@@ -67,7 +67,7 @@ function showView(view){
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + view)?.classList.remove("hidden");
   if(view === "files") setTimeout(refreshFiles, 50);
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",settings:"系統設定"}[view] || "管理平台");
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",tags:"標籤管理",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -1026,7 +1026,7 @@ function renderTagSelect(selected=[]){
   const box = $("tagSelectBox");
   if(!box) return;
   if(!systemTags.length){
-    box.innerHTML = '<div class="empty">尚未建立標籤，請到「系統設定」新增。</div>';
+    box.innerHTML = '<div class="empty">尚未建立標籤，請到左側「標籤管理」新增。</div>';
     return;
   }
   box.innerHTML = systemTags.map(t => `
