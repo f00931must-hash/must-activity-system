@@ -357,68 +357,6 @@ async function uploadAttachment(){
   }
 }
 
-function githubPathFromUrl(urlOrPath){
-  if(!urlOrPath) return "";
-  if(!/^https?:\/\//.test(urlOrPath)) return String(urlOrPath).replace(/^\/+/, "");
-  const base = (siteConfig.baseUrl || "").replace(/\/+$/, "") + "/";
-  if(urlOrPath.startsWith(base)) return urlOrPath.slice(base.length).replace(/^\/+/, "");
-  try{
-    const u = new URL(urlOrPath);
-    const parts = u.pathname.split("/").filter(Boolean);
-    const repoIndex = parts.indexOf(githubRepoInfo().repo);
-    if(repoIndex !== -1) return parts.slice(repoIndex + 1).join("/");
-    const uploadIndex = parts.indexOf("uploads");
-    if(uploadIndex !== -1) return parts.slice(uploadIndex).join("/");
-  }catch(e){}
-  return "";
-}
-
-async function githubGetFileInfo(path){
-  const token = getGithubToken();
-  if(!token) throw new Error("尚未設定 GitHub Token");
-  const info = githubRepoInfo();
-  const cleanPath = githubPathFromUrl(path);
-  if(!cleanPath) throw new Error("找不到 GitHub 檔案路徑");
-  const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(cleanPath).replace(/%2F/g,"/")}?ref=${encodeURIComponent(info.branch)}`, {
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json"
-    }
-  });
-  if(!res.ok){
-    const err = await res.json().catch(()=>({message:res.statusText}));
-    throw new Error(err.message || "GitHub file info failed");
-  }
-  return await res.json();
-}
-
-async function githubDeleteFile(path, name="file"){
-  const token = getGithubToken();
-  if(!token) throw new Error("尚未設定 GitHub Token");
-  const info = githubRepoInfo();
-  const cleanPath = githubPathFromUrl(path);
-  if(!cleanPath) throw new Error("找不到 GitHub 檔案路徑");
-  const fileInfo = await githubGetFileInfo(cleanPath);
-  const res = await fetch(`https://api.github.com/repos/${info.owner}/${info.repo}/contents/${encodeURIComponent(cleanPath).replace(/%2F/g,"/")}`, {
-    method: "DELETE",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Accept": "application/vnd.github+json",
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      message: `delete file: ${name}`,
-      sha: fileInfo.sha,
-      branch: info.branch
-    })
-  });
-  if(!res.ok){
-    const err = await res.json().catch(()=>({message:res.statusText}));
-    throw new Error(err.message || "GitHub delete failed");
-  }
-  return true;
-}
-
 
 
 function renderRegFields(){
