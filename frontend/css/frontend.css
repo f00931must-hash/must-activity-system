@@ -32,3 +32,17 @@
 .compact-attachments a{display:inline-flex;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid #dbeafe;border-radius:999px;padding:6px 10px;text-decoration:none;background:#f8fbff}
 
 .hint-inline{font-size:13px;color:#64748b;font-weight:400}
+
+
+/* v4.0.3：圖片附件直接作為活動海報展開 */
+.activity-poster-section{margin:24px 0 8px}
+.activity-poster-title,.activity-file-title{margin:0 0 12px;font-size:1.15rem}
+.activity-poster-grid{display:grid;gap:16px;justify-items:start}
+.activity-poster-link{display:block;width:min(100%,760px);border-radius:18px;overflow:hidden;border:1px solid #dbeafe;background:#fff;box-shadow:0 10px 28px rgba(15,23,42,.08)}
+.activity-poster-image{display:block;width:100%;height:auto;max-height:1050px;object-fit:contain;background:#f8fafc}
+.activity-poster-link:focus-visible{outline:3px solid #38bdf8;outline-offset:3px}
+.activity-file-section{margin-top:18px}
+@media (max-width:640px){
+  .activity-poster-section{margin-top:18px}
+  .activity-poster-link{border-radius:14px}
+}

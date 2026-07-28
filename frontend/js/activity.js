@@ -164,9 +164,37 @@ async function submitForm(e){
 
 function attachmentHtml(files){
   if(!files || !files.length) return "";
-  return `<div class="attachment-list compact-attachments">
-    ${files.map((f,i) => `<a href="${esc(f.url || "#")}" target="_blank" rel="noopener">📎 ${esc(f.name || ("附件" + (files.length > 1 ? i+1 : "")))}</a>`).join("")}
-  </div>`;
+
+  const isImage = file => {
+    const type = String(file?.type || file?.mimeType || "").toLowerCase();
+    const source = String(file?.name || file?.url || "").split("?")[0].toLowerCase();
+    return type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|svg|avif)$/i.test(source);
+  };
+
+  const images = files.filter(isImage);
+  const attachments = files.filter(file => !isImage(file));
+
+  const posterHtml = images.length ? `
+    <section class="activity-poster-section" aria-label="活動海報">
+      <h2 class="activity-poster-title">活動海報</h2>
+      <div class="activity-poster-grid">
+        ${images.map((file, index) => `
+          <a class="activity-poster-link" href="${esc(file.url || "#")}" target="_blank" rel="noopener" title="點擊查看原圖">
+            <img class="activity-poster-image" src="${esc(file.url || "")}" alt="${esc(file.name || `活動海報${images.length > 1 ? index + 1 : ""}`)}" loading="lazy">
+          </a>
+        `).join("")}
+      </div>
+    </section>` : "";
+
+  const attachmentListHtml = attachments.length ? `
+    <section class="activity-file-section" aria-label="活動附件">
+      <h2 class="activity-file-title">活動附件</h2>
+      <div class="attachment-list compact-attachments">
+        ${attachments.map((file, index) => `<a href="${esc(file.url || "#")}" target="_blank" rel="noopener">📎 ${esc(file.name || ("附件" + (attachments.length > 1 ? index + 1 : "")))}</a>`).join("")}
+      </div>
+    </section>` : "";
+
+  return posterHtml + attachmentListHtml;
 }
 
 function parseLocalTime(value){
