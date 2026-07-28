@@ -324,25 +324,23 @@ async function githubDeleteFile(path, name="file"){
   return true;
 }
 
-async function uploadAttachment(){
+async function uploadAttachment({silent=false}={}){
   const fileInput = $("attachmentFile");
   const file = fileInput?.files?.[0];
   if(!file){
-    alert("請先選擇圖片或 PDF 檔案。");
-    return;
+    if(!silent) alert("請先選擇圖片或 PDF 檔案。");
+    return false;
   }
 
   const allowed = file.type.startsWith("image/") || file.type === "application/pdf" ||
     file.name.toLowerCase().endsWith(".doc") || file.name.toLowerCase().endsWith(".docx") ||
     file.name.toLowerCase().endsWith(".ppt") || file.name.toLowerCase().endsWith(".pptx");
   if(!allowed){
-    alert("目前建議上傳圖片、PDF、Word 或 PPT 檔。");
-    return;
+    throw new Error("目前僅支援圖片、PDF、Word 或 PPT 檔。");
   }
 
   if(file.size > 20 * 1024 * 1024){
-    alert("檔案太大，建議 20MB 以下。");
-    return;
+    throw new Error("檔案太大，請使用 20MB 以下的檔案。");
   }
 
   try{
@@ -350,10 +348,13 @@ async function uploadAttachment(){
     attachments.push(uploaded);
     fileInput.value = "";
     renderAttachments();
-    alert("附件已上傳到 GitHub。");
+    if(!silent) alert("附件已上傳，儲存活動後才會正式綁定到這場活動。");
+    return true;
   }catch(err){
     console.error(err);
+    if(silent) throw err;
     alert("附件上傳失敗：" + err.message);
+    return false;
   }
 }
 
@@ -545,6 +546,22 @@ async function saveActivity(event){
   event.preventDefault();
   event.stopPropagation();
 
+  const saveBtn = event.submitter || document.querySelector('#activityForm button[type="submit"]');
+  const originalText = saveBtn?.textContent;
+  if(saveBtn){
+    saveBtn.disabled = true;
+    saveBtn.textContent = "儲存中…";
+  }
+
+  try{
+    // 老師只要選擇檔案後直接按「儲存」，系統也會先自動上傳，
+    // 避免漏按「上傳附件」而出現活動已儲存、附件卻沒有寫入的情況。
+    if($("attachmentFile")?.files?.[0]){
+      if(saveBtn) saveBtn.textContent = "附件上傳中…";
+      await uploadAttachment({silent:true});
+      if(saveBtn) saveBtn.textContent = "儲存中…";
+    }
+
   const data = cleanUndefined({
     academicYear: val("academicYear").trim(),
     semester: val("semester"),
@@ -582,7 +599,6 @@ async function saveActivity(event){
     return;
   }
 
-  try{
     const id = val("editId");
     if(id){
       await updateDoc(doc(db, "activities", id), data);
@@ -592,12 +608,17 @@ async function saveActivity(event){
       data.createdAt = serverTimestamp();
       await addDoc(collection(db, "activities"), data);
     }
-    alert("已儲存");
+    alert("活動與附件已儲存");
     resetForm();
     showView("activities");
   }catch(err){
     console.error(err);
     alert("儲存失敗：" + err.message);
+  }finally{
+    if(saveBtn){
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalText || "儲存活動";
+    }
   }
 }
 
