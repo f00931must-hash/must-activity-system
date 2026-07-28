@@ -1,6 +1,6 @@
 
 import { db } from "../../shared/js/firebase-app.js";
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { collection, doc, getDoc, addDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const $ = id => document.getElementById(id);
 const id = new URLSearchParams(location.search).get("id");
@@ -51,11 +51,11 @@ function renderForm(){
     <h2>活動回饋表</h2>
     <form id="fbForm">
       <label>姓名 *</label><input class="field" name="name" required>
-      <label>學號 *</label><input class="field" name="studentId" required>
+      <label>學號／職員編號（選填）</label><input class="field" name="studentId">
       <h3>一、活動滿意度</h3>
       ${qs.map((q,i) => likertHtml(q,i)).join("")}
       ${feedbackTextHtml(activity.feedbackTextQuestions || [])}
-      <h3>二、參與活動後，我的心得與感想</h3>
+      <h3>${(activity.feedbackTextQuestions || []).length ? "三" : "二"}、${esc(activity.feedbackEssayQuestion || "參與活動後，我的心得與感想")}</h3>
       <p class="meta">請至少填寫 ${min} 字。</p>
       <textarea class="field" name="comment" required></textarea>
       <div id="msg"></div>
@@ -93,28 +93,11 @@ async function submitForm(e){
     return;
   }
 
-  const studentIdKey = String(fd.get("studentId") || "").trim().toUpperCase();
+  const studentIdInput = String(fd.get("studentId") || "").trim().toUpperCase();
   const nameInput = String(fd.get("name") || "").trim();
 
-  const regRef = doc(db, "activities", id, "registrations", studentIdKey);
-  const regSnap = await getDoc(regRef);
-  if(!regSnap.exists()){
-    $("msg").innerHTML = '<div class="error">查無此學號的報名紀錄，請確認是否有完成報名。</div>';
-    return;
-  }
-
-  const regName = String(regSnap.data().name || "").trim();
-  if(regName && nameInput && regName !== nameInput){
-    $("msg").innerHTML = '<div class="error">姓名與報名資料不一致，請確認姓名或學號。</div>';
-    return;
-  }
-
-  const fbRef = doc(db, "activities", id, "feedbacks", studentIdKey);
-  const fbSnap = await getDoc(fbRef);
-  if(fbSnap.exists()){
-    $("msg").innerHTML = '<div class="error">這個學號已經填寫過回饋。</div>';
-    return;
-  }
+  // 回饋不再綁定報名學號，也不限制同一學號只能填一次。
+  // 每次送出皆建立獨立回饋文件，避免沒有報名或學號輸入差異時無法填寫。
 
   const qs = activity.feedbackQuestions || defaultQuestions();
   const ratings = {};
@@ -123,9 +106,9 @@ async function submitForm(e){
   (activity.feedbackTextQuestions || []).forEach((q,i) => textAnswers[q.label] = fd.get("text_" + i) || "");
 
   try{
-    await setDoc(fbRef, {
+    await addDoc(collection(db, "activities", id, "feedbacks"), {
       name: nameInput,
-      studentId: studentIdKey,
+      studentId: studentIdInput,
       ratings,
       textAnswers,
       comment,

@@ -72,7 +72,7 @@ function renderForm(){
       <label>姓名 *</label><input class="field" name="name" required>
       ${ff.studentId ? `<label>學號／職員編號 *</label><input class="field" name="studentId" required>` : ""}
       ${ff.department ? `<label>單位／班級 <span class="hint-inline">（例如：旅廚二甲、資源教室）</span> *</label><input class="field" name="department" required>` : ""}
-      ${ff.phone ? `<label>聯絡電話 *</label><input class="field" name="phone" required>` : ""}
+      ${ff.phone ? `<label>聯絡電話（選填）</label><input class="field" name="phone">` : ""}
       ${ff.biologicalSex ? `<label>生理性別 *</label>
         <label class="radio-row"><input type="radio" name="biologicalSex" value="男" required> 男</label>
         <label class="radio-row"><input type="radio" name="biologicalSex" value="女"> 女</label>` : ""}

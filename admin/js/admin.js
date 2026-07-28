@@ -67,7 +67,8 @@ function showView(view){
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + view)?.classList.remove("hidden");
   if(view === "files") setTimeout(refreshFiles, 50);
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",tags:"標籤管理",settings:"系統設定"}[view] || "管理平台");
+  if(view === "history") setTimeout(loadAuditHistory, 50);
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",history:"歷史紀錄",tags:"標籤管理",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -155,6 +156,10 @@ function resetForm(){
   setVal("feedbackOpenAt", "");
   setVal("feedbackCloseAt", "");
   setVal("feedbackMinWords", 30);
+  setChecked("feedbackEssayDefault", true);
+  setChecked("feedbackEssayCustom", false);
+  setVal("feedbackEssayQuestion", "參與活動後，我的心得與感想");
+  toggleFeedbackEssayQuestion();
   regFields = [];
   fbQuestions = [...defaultFb];
   feedbackTextQuestions = [];
@@ -194,6 +199,11 @@ function editActivity(id){
   setVal("feedbackOpenAt", a.feedbackOpenAt || "");
   setVal("feedbackCloseAt", a.feedbackCloseAt || "");
   setVal("feedbackMinWords", a.feedbackMinWords || 30);
+  const essayMode = a.feedbackEssayMode === "custom" ? "custom" : "default";
+  setChecked("feedbackEssayDefault", essayMode === "default");
+  setChecked("feedbackEssayCustom", essayMode === "custom");
+  setVal("feedbackEssayQuestion", a.feedbackEssayQuestion || "參與活動後，我的心得與感想");
+  toggleFeedbackEssayQuestion();
   regFields = a.registerFields || [];
   fbQuestions = a.feedbackQuestions || [...defaultFb];
   feedbackTextQuestions = a.feedbackTextQuestions || [];
@@ -233,6 +243,11 @@ function copyActivity(id){
   setVal("feedbackOpenAt", a.feedbackOpenAt || "");
   setVal("feedbackCloseAt", a.feedbackCloseAt || "");
   setVal("feedbackMinWords", a.feedbackMinWords || 30);
+  const essayMode = a.feedbackEssayMode === "custom" ? "custom" : "default";
+  setChecked("feedbackEssayDefault", essayMode === "default");
+  setChecked("feedbackEssayCustom", essayMode === "custom");
+  setVal("feedbackEssayQuestion", a.feedbackEssayQuestion || "參與活動後，我的心得與感想");
+  toggleFeedbackEssayQuestion();
   regFields = JSON.parse(JSON.stringify(a.registerFields || []));
   fbQuestions = [...(a.feedbackQuestions || [])];
   feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
@@ -542,6 +557,52 @@ function bindFieldEvents(){
   document.querySelectorAll(".fb-text-remove").forEach(el => el.onclick = () => { feedbackTextQuestions.splice(Number(el.dataset.i),1); renderFeedbackTextQuestions(); });
 }
 
+function toggleFeedbackEssayQuestion(){
+  const custom = checked("feedbackEssayCustom");
+  const input = $("feedbackEssayQuestion");
+  if(input){
+    input.disabled = !custom;
+    if(!custom) input.value = "參與活動後，我的心得與感想";
+  }
+}
+
+function actorDisplayName(){
+  return currentUser?.displayName || currentUser?.email || "未知使用者";
+}
+
+async function writeAudit(action, targetType, targetName, details=""){
+  if(!currentUser) return;
+  try{
+    await addDoc(collection(db, "auditLogs"), cleanUndefined({
+      action, targetType, targetName, details,
+      actorName: actorDisplayName(), actorEmail: currentUser.email || "",
+      createdAt: serverTimestamp()
+    }));
+  }catch(err){ console.warn("歷史紀錄寫入失敗", err); }
+}
+
+function formatAuditTime(value){
+  try{
+    const d = value?.toDate ? value.toDate() : new Date(value);
+    if(Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("zh-TW", {hour12:false});
+  }catch(e){ return "—"; }
+}
+
+async function loadAuditHistory(){
+  const box = $("auditHistoryList");
+  if(!box) return;
+  box.innerHTML = '<div class="empty">讀取中…</div>';
+  try{
+    const snap = await getDocs(query(collection(db, "auditLogs"), orderBy("createdAt", "desc")));
+    const rows = snap.docs.map(d=>d.data());
+    box.innerHTML = rows.length ? `<table class="data-table"><thead><tr><th>時間</th><th>操作者</th><th>動作</th><th>項目</th><th>內容</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(formatAuditTime(r.createdAt))}</td><td>${esc(r.actorName||r.actorEmail||"")}</td><td>${esc(r.action||"")}</td><td>${esc(r.targetName||r.targetType||"")}</td><td>${esc(r.details||"")}</td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有歷史紀錄。</div>';
+  }catch(err){
+    console.error(err);
+    box.innerHTML = `<div class="error">歷史紀錄讀取失敗：${esc(err.message)}</div>`;
+  }
+}
+
 async function saveActivity(event){
   event.preventDefault();
   event.stopPropagation();
@@ -591,6 +652,8 @@ async function saveActivity(event){
     feedbackQuestions: fbQuestions.filter(Boolean),
     feedbackTextQuestions: feedbackTextQuestions.filter(q => q.label),
     feedbackMinWords: Number(val("feedbackMinWords") || 30),
+    feedbackEssayMode: checked("feedbackEssayCustom") ? "custom" : "default",
+    feedbackEssayQuestion: checked("feedbackEssayCustom") ? (val("feedbackEssayQuestion").trim() || "參與活動後，我的心得與感想") : "參與活動後，我的心得與感想",
     updatedAt: serverTimestamp()
   });
 
@@ -602,11 +665,13 @@ async function saveActivity(event){
     const id = val("editId");
     if(id){
       await updateDoc(doc(db, "activities", id), data);
+      await writeAudit("修改", "活動", data.title, "更新活動內容或設定");
     }else{
       data.registeredCount = 0;
       data.feedbackCount = 0;
       data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "activities"), data);
+      const created = await addDoc(collection(db, "activities"), data);
+      await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
     }
     alert("活動與附件已儲存");
     resetForm();
@@ -624,7 +689,9 @@ async function saveActivity(event){
 
 async function deleteActivity(id){
   if(!confirm("確定刪除此活動？")) return;
+  const a = activities.find(x=>x.id===id);
   await deleteDoc(doc(db, "activities", id));
+  await writeAudit("刪除", "活動", a?.title || id, "刪除活動");
 }
 
 async function copyLink(url){
@@ -870,6 +937,7 @@ async function editRegistration(activityId, studentId){
       customAnswers,
       updatedAt: serverTimestamp()
     });
+    await writeAudit("修改", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${fd.get("name") || studentId}`, "修改報名者資料");
     alert("報名資料已修改。");
     viewRegistrations(activityId);
   });
@@ -931,6 +999,7 @@ async function editFeedback(activityId, studentId){
       comment: fd.get("comment") || "",
       updatedAt: serverTimestamp()
     });
+    await writeAudit("修改", "回饋資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${fd.get("name") || studentId}`, "修改回饋內容");
     alert("回饋資料已修改。");
     viewFeedbacks(activityId);
   });
@@ -939,11 +1008,13 @@ async function editFeedback(activityId, studentId){
 async function deleteRegistration(activityId, studentId){
   if(!confirm("確定刪除此報名資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "registrations", studentId));
+  await writeAudit("刪除", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, "刪除報名資料");
   viewRegistrations(activityId);
 }
 async function deleteFeedback(activityId, studentId){
   if(!confirm("確定刪除此回饋資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "feedbacks", studentId));
+  await writeAudit("刪除", "回饋資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, "刪除回饋資料");
   viewFeedbacks(activityId);
 }
 
@@ -1437,6 +1508,8 @@ bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addMealOptionBtn", e => { e.preventDefault(); mealOptions.push(""); renderMealOptions(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
+$("feedbackEssayDefault")?.addEventListener("change", toggleFeedbackEssayQuestion);
+$("feedbackEssayCustom")?.addEventListener("change", toggleFeedbackEssayQuestion);
 bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
 bindClick("uploadAttachmentBtn", e => { e.preventDefault(); uploadAttachment(); });
 bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({name:"附件", url:""}); renderAttachments(); });
