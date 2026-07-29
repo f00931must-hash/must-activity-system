@@ -39,7 +39,7 @@ function renderActivities(){
   const status = $("statusFilter")?.value || "";
 
   const filtered = activities.filter(a => {
-    const text = `${a.title || ""} ${a.description || ""} ${(a.tags || []).join(" ")}`;
+    const text = `${a.title || ""} ${a.description || ""} ${a.certificationTag || ""} ${(a.tags || []).join(" ")}`;
     const keywordOk = !keyword || text.includes(keyword);
     const statusOk = !status || a.status === status;
     return keywordOk && statusOk;
@@ -62,13 +62,13 @@ function activityCard(a){
   return `<article class="activity-card">
     <div class="activity-head">
       <div class="status-tags">
-        <span class="badge">${esc(statusText(a.status))}</span>${tagHtml(a.tags || [])}
+        <span class="badge">${esc(statusText(a.status))}</span>${tagHtml([a.certificationTag, ...(a.tags || [])].filter(Boolean))}
       </div>
       <h2>${esc(a.title || "未命名活動")}</h2>
     </div>
     <div class="activity-meta">
       <div><strong>日期</strong><span>${esc(a.date || "")}</span></div>
-      <div><strong>時間</strong><span>${esc(a.time || "")}</span></div>
+      <div><strong>活動時間</strong><span>${esc(a.activityTime || a.plannedTime || a.time || "")}</span></div>
       <div><strong>地點</strong><span>${esc(a.location || "")}</span></div>
       <div><strong>報名</strong><span>${capText}</span></div>
     </div>

@@ -34,7 +34,7 @@ function renderHeader(){
   $("activityHeader").innerHTML = `
     <div class="status-tags"><span class="badge">${esc(activity.status || "活動")}</span>${tagHtml(activity.tags || [])}</div>
     <h1>${esc(activity.title)}</h1>
-    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.time || "")}</span></div>
+    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
     <p>${esc(activity.description || "")}</p>
     ${attachmentHtml(activity.attachments || [])}

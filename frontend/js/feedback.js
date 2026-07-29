@@ -23,7 +23,7 @@ function renderHeader(){
   $("activityHeader").innerHTML = `
     <span class="badge">活動回饋</span>
     <h1>${esc(activity.title)}</h1>
-    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.time || "")}</span></div>
+    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
     ${attachmentHtml(activity.attachments || [])}
   `;

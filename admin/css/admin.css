@@ -163,3 +163,5 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
 .stat-section h3{margin:0 0 10px}
 
 .small-path{font-size:12px;color:#64748b;max-width:260px;word-break:break-all}
+
+.time-range{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}.activity-time-block{margin:14px 0}.time-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.check-row.compact{margin:0;font-weight:600}.tag-select-box{margin-bottom:16px}

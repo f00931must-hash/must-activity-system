@@ -10,6 +10,7 @@ const provider = new GoogleAuthProvider();
 let activities = [];
 let adminEmails = [];
 let systemTags = [];
+let certificationTags = [];
 let currentUser = null;
 let regFields = [];
 let fbQuestions = [];
@@ -104,11 +105,11 @@ function card(a){
   const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "未設定";
   return `<article class="activity-admin-card">
     <div class="activity-card-main">
-      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml(a.tags || [])}</div></div>
+      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([a.certificationTag, ...(a.tags || [])].filter(Boolean))}</div></div>
       <div class="activity-info-grid">
         <div><strong>學期</strong><span>${esc(sem)}</span></div>
         <div><strong>日期</strong><span>📅 ${esc(a.date||"")}</span></div>
-        <div><strong>時間</strong><span>${esc(a.time||"")}</span></div>
+        <div><strong>活動時間</strong><span>${esc(displayActivityTime(a))}</span></div>
         <div><strong>地點</strong><span>📍 ${esc(a.location||"")}</span></div>
         <div><strong>報名</strong><span>${capText}</span></div>
         <div><strong>回饋</strong><span>${a.feedbackCount||0} 份</span></div>
@@ -138,7 +139,12 @@ function resetForm(){
   setVal("title", "");
   const dateEl = $("date");
   if(dateEl) dateEl.valueAsDate = new Date();
-  setVal("time", "");
+  setVal("plannedStartTime", "");
+  setVal("plannedEndTime", "");
+  setChecked("activityTimeSame", true);
+  setVal("activityStartTime", "");
+  setVal("activityEndTime", "");
+  toggleActivityTimeSame();
   setVal("location", "");
   setVal("description", "");
   setVal("capacity", 0);
@@ -165,6 +171,7 @@ function resetForm(){
   feedbackTextQuestions = [];
   attachments = [];
   renderAttachments();
+  renderTagSelect([], "");
   renderRegFields();
   renderFbQuestions();
   renderFeedbackTextQuestions();
@@ -180,7 +187,11 @@ function editActivity(id){
   setVal("semester", a.semester || "");
   setVal("title", a.title || "");
   setVal("date", a.date || "");
-  setVal("time", a.time || "");
+  const planned = splitTimeRange(a.plannedTime || a.time || "");
+  const actual = splitTimeRange(a.activityTime || a.plannedTime || a.time || "");
+  setVal("plannedStartTime", planned[0]); setVal("plannedEndTime", planned[1]);
+  setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
+  setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
@@ -209,6 +220,7 @@ function editActivity(id){
   feedbackTextQuestions = a.feedbackTextQuestions || [];
   attachments = a.attachments || [];
   renderAttachments();
+  renderTagSelect(a.tags || [], a.certificationTag || "");
   renderRegFields();
   renderFbQuestions();
   renderFeedbackTextQuestions();
@@ -224,7 +236,11 @@ function copyActivity(id){
   setVal("semester", a.semester || "");
   setVal("title", (a.title || "") + "（複製）");
   setVal("date", a.date || "");
-  setVal("time", a.time || "");
+  const planned = splitTimeRange(a.plannedTime || a.time || "");
+  const actual = splitTimeRange(a.activityTime || a.plannedTime || a.time || "");
+  setVal("plannedStartTime", planned[0]); setVal("plannedEndTime", planned[1]);
+  setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
+  setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
@@ -252,7 +268,7 @@ function copyActivity(id){
   fbQuestions = [...(a.feedbackQuestions || [])];
   feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
   attachments = JSON.parse(JSON.stringify(a.attachments || []));
-  renderAttachments(); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
+  renderAttachments(); renderTagSelect(a.tags || [], a.certificationTag || ""); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
 }
 
 function renderMealOptions(){
@@ -628,8 +644,12 @@ async function saveActivity(event){
     semester: val("semester"),
     title: val("title").trim(),
     date: val("date"),
-    time: val("time").trim(),
+    plannedTime: joinTimeRange(val("plannedStartTime"), val("plannedEndTime")),
+    activityTimeSame: checked("activityTimeSame"),
+    activityTime: checked("activityTimeSame") ? joinTimeRange(val("plannedStartTime"), val("plannedEndTime")) : joinTimeRange(val("activityStartTime"), val("activityEndTime")),
+    time: joinTimeRange(val("plannedStartTime"), val("plannedEndTime")),
     location: val("location").trim(),
+    certificationTag: getSelectedCertificationTag(),
     tags: [...new Set(getSelectedTags())],
     description: val("description").trim(),
     capacity: Number(val("capacity") || 0),
@@ -791,7 +811,8 @@ async function exportRegistrations(id){
   const rows = snap.docs.map(d=>d.data());
   const week = weekdayText(a.date);
   const rocDate = rocDateText(a.date);
-  const timeText = a.time ? `${rocDate}${week ? `（${week}）` : ""} ${esc(a.time)}` : `${rocDate}${week ? `（${week}）` : ""}`;
+  const planTime = displayPlannedTime(a);
+  const timeText = planTime ? `${rocDate}${week ? `（${week}）` : ""} ${esc(planTime)}` : `${rocDate}${week ? `（${week}）` : ""}`;
   const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期 健康與諮商中心`;
   const titleLine = `資源教室「${esc(a.title || "")}」活動簽到表`;
 
@@ -1048,7 +1069,7 @@ async function exportFeedbackWord(id){
   const textQs = a.feedbackTextQuestions || [];
   const total = rows.length || 1;
   const week = weekdayText(a.date);
-  const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(a.time || "")}`;
+  const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(displayPlannedTime(a))}`;
   const headerLine = `${esc(a.academicYear || "")}學年度第 ${esc(a.semester || "")} 學期明新科技大學　學務處健康與諮商中心資源教室`;
   const tableRows = qs.map((q,i)=>{
     const cells = likertOptions.map(o=>{
@@ -1121,38 +1142,57 @@ function weekdayText(dateStr){
 }
 
 
-function getSelectedTags(){
-  return Array.from(document.querySelectorAll("#tagSelectBox .tag-check:checked")).map(el => el.value);
+function splitTimeRange(text){
+  const parts=String(text||"").split(/\s*[-~至]\s*/).map(x=>x.trim());
+  return [parts[0]||"",parts[1]||""];
 }
-
-function renderTagSelect(selected=[]){
-  const selectedTags = Array.isArray(selected) ? selected : [];
-  const box = $("tagSelectBox");
-  if(!box) return;
-  if(!systemTags.length){
-    box.innerHTML = '<div class="empty">尚未建立標籤，請到左側「標籤管理」新增。</div>';
-    return;
-  }
-  box.innerHTML = systemTags.map(t => `
-    <label class="tag-check-label">
-      <input type="checkbox" class="tag-check" value="${esc(t)}" ${selectedTags.includes(t) ? "checked" : ""}>
-      <span class="tag ${tagColorClass(t)}">${esc(t)}</span>
-    </label>
-  `).join("");
+function joinTimeRange(start,end){
+  if(!start && !end) return "";
+  return [start,end].filter(Boolean).join("-");
 }
-
+function displayActivityTime(a){ return a.activityTime || a.plannedTime || a.time || ""; }
+function displayPlannedTime(a){ return a.plannedTime || a.time || ""; }
+function toggleActivityTimeSame(){
+  const same=checked("activityTimeSame");
+  ["activityStartTime","activityEndTime"].forEach(id=>{const el=$(id); if(el){el.disabled=same; if(same) el.value=id.includes("Start")?val("plannedStartTime"):val("plannedEndTime");}});
+}
+function getSelectedTags(){ return Array.from(document.querySelectorAll("#tagSelectBox .tag-check:checked")).map(el=>el.value); }
+function getSelectedCertificationTag(){ return document.querySelector('#certificationTagSelectBox input[name="certificationTag"]:checked')?.value || ""; }
+function renderTagSelect(selected=[], selectedCertification=""){
+  const selectedTags=Array.isArray(selected)?selected:[];
+  const box=$("tagSelectBox");
+  if(box) box.innerHTML=systemTags.length?systemTags.map(t=>`<label class="tag-check-label"><input type="checkbox" class="tag-check" value="${esc(t)}" ${selectedTags.includes(t)?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join(""):'<div class="empty">尚未建立一般標籤。</div>';
+  const certBox=$("certificationTagSelectBox");
+  if(certBox) certBox.innerHTML=certificationTags.length?`<label class="tag-check-label"><input type="radio" name="certificationTag" value="" ${!selectedCertification?"checked":""}><span class="tag">不設定</span></label>`+certificationTags.map(t=>`<label class="tag-check-label"><input type="radio" name="certificationTag" value="${esc(t)}" ${selectedCertification===t?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join(""):'<div class="empty">尚未建立可認證類別。</div>';
+}
 function renderTagManager(){
-  const box=$("tagManageBox"); if(!box) return;
-  box.innerHTML=systemTags.length ? systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join("") : '<div class="empty">目前尚未建立標籤。</div>';
+  const box=$("tagManageBox"); if(box) box.innerHTML=systemTags.length?systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join(""):'<div class="empty">目前尚未建立一般標籤。</div>';
+  const cbox=$("certificationTagManageBox"); if(cbox) cbox.innerHTML=certificationTags.length?certificationTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-certification-tag="${esc(t)}">刪除</button></span>`).join(""):'<div class="empty">目前尚未建立可認證類別。</div>';
+  const q=$("certificationQuerySelect"); if(q){const current=q.value;q.innerHTML='<option value="">請選擇可認證類別</option>'+certificationTags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");q.value=certificationTags.includes(current)?current:"";}
 }
 async function loadTags(){
   const snap=await getDoc(doc(db,"settings","activityTags"));
-  systemTags=snap.exists() ? (snap.data().tags || []) : [];
-  renderTagManager(); renderTagSelect([]);
+  const data=snap.exists()?snap.data():{};
+  systemTags=Array.isArray(data.multiTags)?data.multiTags:(data.tags||[]);
+  certificationTags=Array.isArray(data.singleTags)?data.singleTags:[];
+  renderTagManager(); renderTagSelect([],"");
 }
 async function saveTags(){
-  await setDoc(doc(db,"settings","activityTags"),{tags: systemTags,updatedAt:serverTimestamp()},{merge:true});
-  renderTagManager(); renderTagSelect(getSelectedTags());
+  await setDoc(doc(db,"settings","activityTags"),{tags:systemTags,multiTags:systemTags,singleTags:certificationTags,updatedAt:serverTimestamp()},{merge:true});
+  renderTagManager(); renderTagSelect(getSelectedTags(),getSelectedCertificationTag());
+}
+async function runCertificationQuery(){
+  const selected=val("certificationQuerySelect"); const out=$("certificationQueryResult");
+  if(!selected){if(out) out.innerHTML='<div class="empty">請先選擇類別。</div>';return;}
+  if(out) out.innerHTML='<div class="empty">查詢中…</div>';
+  const chosen=activities.filter(a=>a.certificationTag===selected);
+  const people=new Map();
+  for(const a of chosen){
+    const snap=await getDocs(collection(db,"activities",a.id,"registrations"));
+    snap.docs.forEach(d=>{const r=d.data(); const key=String(r.studentId||r.name||d.id).trim().toUpperCase(); if(!key)return; if(!people.has(key))people.set(key,{name:r.name||"",studentId:r.studentId||"",activities:[]}); people.get(key).activities.push(a.title||"未命名活動");});
+  }
+  const rows=[...people.values()].sort((a,b)=>b.activities.length-a.activities.length||a.name.localeCompare(b.name,"zh-Hant"));
+  if(out) out.innerHTML=rows.length?`<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號／職員編號</th><th>參加場次</th><th>活動名稱</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td><td>${r.activities.length}</td><td>${esc(r.activities.join("、"))}</td></tr>`).join("")}</tbody></table>`:'<div class="empty">目前沒有參加資料。</div>';
 }
 
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
@@ -1511,6 +1551,8 @@ bindClick("loginBtn", async (e) => {
 
 bindClick("logoutBtn", () => signOut(auth));
 bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
+bindClick("addCertificationTagBtn", async e=>{e.preventDefault(); const tag=val("certificationTagInput").trim(); if(!tag)return; if(!certificationTags.includes(tag))certificationTags.push(tag); setVal("certificationTagInput",""); await saveTags();});
+bindClick("runCertificationQueryBtn", async e=>{e.preventDefault(); await runCertificationQuery();});
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("runStatsBtn", e=>{e.preventDefault(); runStatistics();});
 bindClick("downloadStatsCsvBtn", e=>{e.preventDefault(); downloadStatsCsv();});
@@ -1590,6 +1632,8 @@ document.addEventListener("click", async (e) => {
   const delFile = e.target.closest("[data-delete-file]");
   if(delFile) return deleteManagedFile(Number(delFile.dataset.deleteFile));
 
+  const remCertTag=e.target.closest("[data-remove-certification-tag]");
+  if(remCertTag){ const t=remCertTag.dataset.removeCertificationTag; if(confirm(`刪除可認證類別「${t}」？既有活動資料不會自動移除。`)){certificationTags=certificationTags.filter(x=>x!==t); await saveTags();} return; }
   const remTag=e.target.closest("[data-remove-tag]");
   if(remTag){ systemTags=systemTags.filter(t=>t!==remTag.dataset.removeTag); await saveTags(); return; }
 
@@ -1622,5 +1666,8 @@ onAuthStateChanged(auth, async user => {
 
 const studentLookupInputEl=$("studentLookupInput");
 if(studentLookupInputEl) studentLookupInputEl.addEventListener("keydown", e=>{if(e.key==="Enter"){e.preventDefault(); lookupStudentActivities();}});
+const activityTimeSameEl=$("activityTimeSame");
+if(activityTimeSameEl) activityTimeSameEl.addEventListener("change",toggleActivityTimeSame);
+["plannedStartTime","plannedEndTime"].forEach(id=>$(id)?.addEventListener("input",()=>{if(checked("activityTimeSame")) toggleActivityTimeSame();}));
 const tagInputEl=$("tagInput");
 if(tagInputEl) tagInputEl.addEventListener("keydown", e=>{if(e.key==="Enter"){e.preventDefault(); $("addTagBtn")?.click();}});
