@@ -1005,17 +1005,29 @@ async function editFeedback(activityId, studentId){
   });
 }
 
+async function syncActivitySubcollectionCount(activityId, subcollectionName, countField){
+  const snap = await getDocs(collection(db, "activities", activityId, subcollectionName));
+  const count = snap.size;
+  await updateDoc(doc(db, "activities", activityId), {
+    [countField]: count,
+    updatedAt: serverTimestamp()
+  });
+  return count;
+}
+
 async function deleteRegistration(activityId, studentId){
   if(!confirm("確定刪除此報名資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "registrations", studentId));
-  await writeAudit("刪除", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, "刪除報名資料");
-  viewRegistrations(activityId);
+  const remainingCount = await syncActivitySubcollectionCount(activityId, "registrations", "registeredCount");
+  await writeAudit("刪除", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, `刪除報名資料，剩餘 ${remainingCount} 人`);
+  await viewRegistrations(activityId);
 }
 async function deleteFeedback(activityId, studentId){
   if(!confirm("確定刪除此回饋資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "feedbacks", studentId));
-  await writeAudit("刪除", "回饋資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, "刪除回饋資料");
-  viewFeedbacks(activityId);
+  const remainingCount = await syncActivitySubcollectionCount(activityId, "feedbacks", "feedbackCount");
+  await writeAudit("刪除", "回饋資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, `刪除回饋資料，剩餘 ${remainingCount} 份`);
+  await viewFeedbacks(activityId);
 }
 
 async function exportFeedbacks(id){
