@@ -11,6 +11,9 @@ let activities = [];
 let adminEmails = [];
 let systemTags = [];
 let certificationTags = [];
+let certificationRosterData = {};
+let certificationExclusions = [];
+let latestCertificationRows = [];
 let currentUser = null;
 let regFields = [];
 let fbQuestions = [];
@@ -69,7 +72,8 @@ function showView(view){
   $("view-" + view)?.classList.remove("hidden");
   if(view === "files") setTimeout(refreshFiles, 50);
   if(view === "history") setTimeout(loadAuditHistory, 50);
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",history:"歷史紀錄",tags:"標籤管理",settings:"系統設定"}[view] || "管理平台");
+  if(view === "certification") setTimeout(()=>{ renderCertificationSelectors(); }, 50);
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",history:"歷史紀錄",tags:"標籤管理",certification:"認證時數",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -1168,7 +1172,7 @@ function renderTagSelect(selected=[], selectedCertification=""){
 function renderTagManager(){
   const box=$("tagManageBox"); if(box) box.innerHTML=systemTags.length?systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join(""):'<div class="empty">目前尚未建立一般標籤。</div>';
   const cbox=$("certificationTagManageBox"); if(cbox) cbox.innerHTML=certificationTags.length?certificationTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-certification-tag="${esc(t)}">刪除</button></span>`).join(""):'<div class="empty">目前尚未建立可認證類別。</div>';
-  const q=$("certificationQuerySelect"); if(q){const current=q.value;q.innerHTML='<option value="">請選擇可認證類別</option>'+certificationTags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");q.value=certificationTags.includes(current)?current:"";}
+  renderCertificationSelectors();
 }
 async function loadTags(){
   const snap=await getDoc(doc(db,"settings","activityTags"));
@@ -1181,18 +1185,92 @@ async function saveTags(){
   await setDoc(doc(db,"settings","activityTags"),{tags:systemTags,multiTags:systemTags,singleTags:certificationTags,updatedAt:serverTimestamp()},{merge:true});
   renderTagManager(); renderTagSelect(getSelectedTags(),getSelectedCertificationTag());
 }
-async function runCertificationQuery(){
-  const selected=val("certificationQuerySelect"); const out=$("certificationQueryResult");
-  if(!selected){if(out) out.innerHTML='<div class="empty">請先選擇類別。</div>';return;}
-  if(out) out.innerHTML='<div class="empty">查詢中…</div>';
-  const chosen=activities.filter(a=>a.certificationTag===selected);
-  const people=new Map();
-  for(const a of chosen){
-    const snap=await getDocs(collection(db,"activities",a.id,"registrations"));
-    snap.docs.forEach(d=>{const r=d.data(); const key=String(r.studentId||r.name||d.id).trim().toUpperCase(); if(!key)return; if(!people.has(key))people.set(key,{name:r.name||"",studentId:r.studentId||"",activities:[]}); people.get(key).activities.push(a.title||"未命名活動");});
+function renderCertificationSelectors(){
+  const q=$("certificationQuerySelect");
+  if(q){
+    const current=q.value;
+    q.innerHTML='<option value="">請選擇可認證類別</option>'+certificationTags.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+    q.value=certificationTags.includes(current)?current:"";
   }
-  const rows=[...people.values()].sort((a,b)=>b.activities.length-a.activities.length||a.name.localeCompare(b.name,"zh-Hant"));
-  if(out) out.innerHTML=rows.length?`<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號／職員編號</th><th>參加場次</th><th>活動名稱</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td><td>${r.activities.length}</td><td>${esc(r.activities.join("、"))}</td></tr>`).join("")}</tbody></table>`:'<div class="empty">目前沒有參加資料。</div>';
+}
+function normalizeRosterLine(line){
+  const parts=String(line||"").split(/[,，\t]/).map(x=>x.trim()).filter(Boolean);
+  return {name:parts[0]||"",studentId:parts[1]||""};
+}
+function rosterKey(person){ return `${String(person.name||"").trim()}|${String(person.studentId||"").trim().toUpperCase()}`; }
+async function loadCertificationSettings(){
+  const [rosterSnap, exclusionSnap]=await Promise.all([
+    getDoc(doc(db,"settings","certificationRoster")),
+    getDoc(doc(db,"settings","certificationAttendance"))
+  ]);
+  certificationRosterData=rosterSnap.exists()?(rosterSnap.data().terms||{}):{};
+  certificationExclusions=exclusionSnap.exists()?(exclusionSnap.data().exclusions||[]):[];
+}
+function renderCertificationRoster(term){
+  const out=$("certificationRosterList"); if(!out)return;
+  const rows=Array.isArray(certificationRosterData[term])?certificationRosterData[term]:[];
+  out.innerHTML=rows.length?rows.map((p,i)=>`<div class="roster-item"><span><strong>${esc(p.name)}</strong>${p.studentId?`<small>${esc(p.studentId)}</small>`:""}</span><button type="button" class="ghost-btn danger-btn" data-remove-roster="${i}" data-term="${esc(term)}">刪除</button></div>`).join(""):'<div class="empty">此學期尚未建立名單。</div>';
+}
+async function saveCertificationRoster(){
+  const term=val("certificationTerm").trim();
+  if(!term){alert("請先輸入學期，例如：115-1");return;}
+  const input=val("certificationRosterInput");
+  const existing=Array.isArray(certificationRosterData[term])?certificationRosterData[term]:[];
+  const added=input.split(/\r?\n/).map(normalizeRosterLine).filter(p=>p.name);
+  const map=new Map(existing.map(p=>[rosterKey(p),p]));
+  added.forEach(p=>map.set(rosterKey(p),p));
+  certificationRosterData[term]=[...map.values()];
+  await setDoc(doc(db,"settings","certificationRoster"),{terms:certificationRosterData,updatedAt:serverTimestamp()},{merge:true});
+  setVal("certificationRosterInput",""); setVal("certificationQueryTerm",term); renderCertificationRoster(term);
+  await writeAudit("更新","認證名單",term,`名單共 ${certificationRosterData[term].length} 人`);
+}
+function loadCertificationRoster(){
+  const term=val("certificationTerm").trim();
+  if(!term){alert("請先輸入學期");return;}
+  setVal("certificationQueryTerm",term); renderCertificationRoster(term);
+}
+function isExcluded(term,category,person,activityId){
+  const key=rosterKey(person);
+  return certificationExclusions.some(x=>x.term===term&&x.category===category&&x.personKey===key&&x.activityId===activityId);
+}
+async function runCertificationQuery(){
+  const selected=val("certificationQuerySelect"); const term=val("certificationQueryTerm").trim(); const out=$("certificationQueryResult");
+  if(!selected||!term){if(out)out.innerHTML='<div class="empty">請先選擇類別並輸入學期。</div>';return;}
+  const roster=Array.isArray(certificationRosterData[term])?certificationRosterData[term]:[];
+  if(!roster.length){if(out)out.innerHTML='<div class="empty">這個學期尚未建立認證學生名單。</div>';return;}
+  if(out)out.innerHTML='<div class="empty">查詢中…</div>';
+  const chosen=activities.filter(a=>a.certificationTag===selected && `${a.academicYear||""}-${a.semester||""}`===term);
+  const results=[];
+  for(const person of roster){
+    const attended=[];
+    for(const a of chosen){
+      const snap=await getDocs(collection(db,"activities",a.id,"registrations"));
+      const match=snap.docs.find(d=>{const r=d.data(); const sid=String(r.studentId||"").trim().toUpperCase(); const name=String(r.name||"").trim(); return person.studentId?sid===String(person.studentId).trim().toUpperCase():name===String(person.name).trim();});
+      if(match && !isExcluded(term,selected,person,a.id)) attended.push({activityId:a.id,title:a.title||"未命名活動",date:a.date||"",registrationId:match.id});
+    }
+    results.push({...person,activities:attended});
+  }
+  latestCertificationRows=results.map(r=>({term,category:selected,...r}));
+  if(out)out.innerHTML=results.map((r,i)=>`<details class="cert-person" ${i===0?"open":""}><summary><strong>${esc(r.name)}－${esc(term)}參加場次共 ${r.activities.length} 場</strong>${r.studentId?`<span>${esc(r.studentId)}</span>`:""}</summary><div class="cert-activities">${r.activities.length?r.activities.map(a=>`<div class="cert-activity-row"><span>${esc(a.date)}　${esc(a.title)}</span><button type="button" class="ghost-btn danger-btn" data-exclude-cert-activity="1" data-term="${esc(term)}" data-category="${esc(selected)}" data-name="${esc(r.name)}" data-student-id="${esc(r.studentId||"")}" data-activity-id="${esc(a.activityId)}" data-activity-title="${esc(a.title)}">刪除此場次</button></div>`).join(""):'<div class="empty">目前沒有認證場次。</div>'}</div></details>`).join("");
+}
+async function excludeCertificationActivity(btn){
+  const person={name:btn.dataset.name||"",studentId:btn.dataset.studentId||""};
+  const item={term:btn.dataset.term,category:btn.dataset.category,personKey:rosterKey(person),personName:person.name,studentId:person.studentId,activityId:btn.dataset.activityId,activityTitle:btn.dataset.activityTitle,removedBy:actorDisplayName(),removedAt:new Date().toISOString()};
+  if(!confirm(`確定將「${item.activityTitle}」從 ${person.name} 的認證場次中移除？\n原始報名資料仍會保留。`))return;
+  if(!certificationExclusions.some(x=>x.term===item.term&&x.category===item.category&&x.personKey===item.personKey&&x.activityId===item.activityId)) certificationExclusions.push(item);
+  await setDoc(doc(db,"settings","certificationAttendance"),{exclusions:certificationExclusions,updatedAt:serverTimestamp()},{merge:true});
+  await writeAudit("排除場次","認證時數",person.name,`${item.term}／${item.category}／${item.activityTitle}`);
+  await runCertificationQuery();
+}
+function downloadCertificationExcel(){
+  if(!latestCertificationRows.length){alert("請先執行查詢。");return;}
+  const rows=[];
+  latestCertificationRows.forEach(r=>{
+    if(r.activities.length) r.activities.forEach(a=>rows.push(`<tr><td>${esc(r.name)}</td><td>${esc(r.studentId||"")}</td><td>${esc(r.term)}</td><td>${esc(r.category)}</td><td>${r.activities.length}</td><td>${esc(a.date)}</td><td>${esc(a.title)}</td></tr>`));
+    else rows.push(`<tr><td>${esc(r.name)}</td><td>${esc(r.studentId||"")}</td><td>${esc(r.term)}</td><td>${esc(r.category)}</td><td>0</td><td></td><td></td></tr>`);
+  });
+  const html=`<html><head><meta charset="utf-8"></head><body><table border="1"><tr><th>姓名</th><th>學號／職員編號</th><th>學期</th><th>認證類別</th><th>參加總場次</th><th>活動日期</th><th>活動名稱</th></tr>${rows.join("")}</table></body></html>`;
+  downloadFile(`認證時數_${latestCertificationRows[0].term}_${latestCertificationRows[0].category}.xls`,html,"application/vnd.ms-excel;charset=utf-8");
 }
 
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
@@ -1553,6 +1631,9 @@ bindClick("logoutBtn", () => signOut(auth));
 bindClick("addTagBtn", async e=>{e.preventDefault(); const tag=val("tagInput").trim(); if(!tag) return; if(!systemTags.includes(tag)) systemTags.push(tag); setVal("tagInput",""); await saveTags();});
 bindClick("addCertificationTagBtn", async e=>{e.preventDefault(); const tag=val("certificationTagInput").trim(); if(!tag)return; if(!certificationTags.includes(tag))certificationTags.push(tag); setVal("certificationTagInput",""); await saveTags();});
 bindClick("runCertificationQueryBtn", async e=>{e.preventDefault(); await runCertificationQuery();});
+bindClick("saveCertificationRosterBtn", async e=>{e.preventDefault(); await saveCertificationRoster();});
+bindClick("loadCertificationRosterBtn", e=>{e.preventDefault(); loadCertificationRoster();});
+bindClick("downloadCertificationExcelBtn", e=>{e.preventDefault(); downloadCertificationExcel();});
 bindClick("studentLookupBtn", e=>{e.preventDefault(); lookupStudentActivities();});
 bindClick("runStatsBtn", e=>{e.preventDefault(); runStatistics();});
 bindClick("downloadStatsCsvBtn", e=>{e.preventDefault(); downloadStatsCsv();});
@@ -1632,6 +1713,11 @@ document.addEventListener("click", async (e) => {
   const delFile = e.target.closest("[data-delete-file]");
   if(delFile) return deleteManagedFile(Number(delFile.dataset.deleteFile));
 
+  const removeRoster=e.target.closest("[data-remove-roster]");
+  if(removeRoster){ const term=removeRoster.dataset.term; const i=Number(removeRoster.dataset.removeRoster); const rows=[...(certificationRosterData[term]||[])]; const removed=rows.splice(i,1)[0]; certificationRosterData[term]=rows; await setDoc(doc(db,"settings","certificationRoster"),{terms:certificationRosterData,updatedAt:serverTimestamp()},{merge:true}); renderCertificationRoster(term); await writeAudit("刪除","認證名單",removed?.name||term,term); return; }
+  const excludeBtn=e.target.closest("[data-exclude-cert-activity]");
+  if(excludeBtn){ await excludeCertificationActivity(excludeBtn); return; }
+
   const remCertTag=e.target.closest("[data-remove-certification-tag]");
   if(remCertTag){ const t=remCertTag.dataset.removeCertificationTag; if(confirm(`刪除可認證類別「${t}」？既有活動資料不會自動移除。`)){certificationTags=certificationTags.filter(x=>x!==t); await saveTags();} return; }
   const remTag=e.target.closest("[data-remove-tag]");
@@ -1652,6 +1738,7 @@ onAuthStateChanged(auth, async user => {
   currentUser = user;
   await loadAdmins();
   await loadTags();
+  await loadCertificationSettings();
   if(!isAdmin(user.email)){
     alert("這個帳號沒有後台權限：" + user.email);
     await signOut(auth);

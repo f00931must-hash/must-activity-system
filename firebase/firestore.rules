@@ -56,6 +56,14 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /settings/certificationRoster {
+      allow read, create, update, delete: if isAdmin();
+    }
+
+    match /settings/certificationAttendance {
+      allow read, create, update, delete: if isAdmin();
+    }
+
     match /settings/admins {
       // 讓已登入老師可以讀取名單，才能判斷自己是否為管理者
       allow read: if signedIn();
