@@ -1,6 +1,6 @@
 
 import { db } from "../../shared/js/firebase-app.js";
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const $ = id => document.getElementById(id);
 const id = new URLSearchParams(location.search).get("id");
@@ -36,7 +36,7 @@ function renderHeader(){
     <h1>${esc(activity.title)}</h1>
     <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
-    <p>${esc(activity.description || "")}</p>
+    <p class="activity-desc">${esc(activity.description || "")}</p>
     ${attachmentHtml(activity.attachments || [])}
   `;
 }
@@ -77,6 +77,7 @@ function renderForm(){
         <label class="radio-row"><input type="radio" name="biologicalSex" value="男" required> 男</label>
         <label class="radio-row"><input type="radio" name="biologicalSex" value="女"> 女</label>` : ""}
       ${ff.meal ? mealHtml() : ""}
+      ${sessionFieldsHtml()}
       ${(activity.registerFields || []).map(fieldHtml).join("")}
       <div id="msg"></div>
       <button class="primary-btn" type="submit">送出報名</button>
@@ -85,6 +86,11 @@ function renderForm(){
   $("regForm").addEventListener("submit", submitForm);
 }
 
+
+function sessionFieldsHtml(){
+  if(!activity.multiSessionEnabled || !(activity.sessions || []).length) return "";
+  return `<label>可參加場次 * <span class="hint-inline">（可複選）</span></label><div class="session-choice-list">${activity.sessions.map((s,i)=>{const label=`${s.date||""} ${s.startTime||""}${s.endTime?`～${s.endTime}`:""}`.trim();return `<label class="check-row"><input type="checkbox" name="availableSessions" value="${esc(s.id||String(i))}"> ${esc(label)}</label>`}).join("")}</div>`;
+}
 function mealHtml(){
   const opts = (activity.mealOptions && activity.mealOptions.length) ? activity.mealOptions : ["葷","素","不用餐"];
   const normalized = opts.map(o => typeof o === "string" ? {label:o, imageUrl:""} : {label:o.label || "", imageUrl:o.imageUrl || ""}).filter(o => o.label);
@@ -113,6 +119,9 @@ function fieldHtml(f, i){
           </label>`).join("")}
       </div>`;
   }
+  if(f.type === "checkbox"){
+    return `<label>${esc(f.label)} ${f.required ? "*" : ""}</label>` + (f.options || []).map(o => `<label class="check-row"><input type="checkbox" name="custom_${i}" value="${esc(o)}"> ${esc(o)}</label>`).join("");
+  }
   if(f.type === "radio"){
     return `<label>${esc(f.label)} ${f.required ? "*" : ""}</label>` +
       (f.options || []).map(o => `<label class="radio-row"><input type="radio" name="custom_${i}" value="${esc(o)}" ${req}> ${esc(o)}</label>`).join("");
@@ -134,8 +143,14 @@ async function submitForm(e){
   }
 
   const customAnswers = {};
-  (activity.registerFields || []).forEach((f,i) => customAnswers[f.label] = fd.get("custom_" + i) || "");
+  (activity.registerFields || []).forEach((f,i) => customAnswers[f.label] = f.type === "checkbox" ? fd.getAll("custom_" + i) : (fd.get("custom_" + i) || ""));
+  const availableSessions = fd.getAll("availableSessions");
+  if(activity.multiSessionEnabled && !availableSessions.length){ $("msg").innerHTML = '<div class="error">請至少勾選一個可參加場次。</div>'; return; }
 
+  const normalizedName = String(fd.get("name") || "").replace(/[\s　]+/g, "").trim();
+  const allRegs = await getDocs(collection(db, "activities", id, "registrations"));
+  const sameName = allRegs.docs.find(d => String(d.data().normalizedName || d.data().name || "").replace(/[\s　]+/g, "").trim() === normalizedName);
+  if(sameName){ $("msg").innerHTML = '<div class="error">此姓名已報名過本活動。若為同名同姓，請洽活動承辦老師確認。</div>'; return; }
   const regRef = doc(db, "activities", id, "registrations", studentIdKey);
   const existing = await getDoc(regRef);
   if(existing.exists()){
@@ -146,12 +161,15 @@ async function submitForm(e){
   try{
     await setDoc(regRef, {
       name: fd.get("name"),
+      normalizedName,
       studentId: ff.studentId ? studentIdKey : "",
       department: ff.department ? fd.get("department") : "",
       phone: ff.phone ? fd.get("phone") : "",
       biologicalSex: ff.biologicalSex ? fd.get("biologicalSex") : "",
       meal: ff.meal ? fd.get("meal") : "",
       customAnswers,
+      availableSessions,
+      assignedSession: "",
       createdAt: serverTimestamp()
     });
     await updateDoc(doc(db, "activities", id), { registeredCount: increment(1) });

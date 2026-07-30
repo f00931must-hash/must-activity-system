@@ -20,6 +20,7 @@ let fbQuestions = [];
 let feedbackTextQuestions = [];
 let attachments = [];
 let mealOptions = ["葷","素","不用餐"];
+let sessions = [];
 let adminSearchText = "";
 let latestStatsRows = [];
 let latestFileRows = [];
@@ -150,6 +151,7 @@ function resetForm(){
   setVal("activityEndTime", "");
   toggleActivityTimeSame();
   setVal("location", "");
+  setChecked("multiSessionEnabled", false); sessions=[]; renderSessions();
   setVal("description", "");
   setVal("capacity", 0);
   setVal("status", "open");
@@ -197,6 +199,7 @@ function editActivity(id){
   setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
   setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
+  setChecked("multiSessionEnabled", !!a.multiSessionEnabled); sessions=JSON.parse(JSON.stringify(a.sessions||[])); renderSessions();
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
   setVal("status", a.status || "open");
@@ -246,6 +249,7 @@ function copyActivity(id){
   setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
   setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
+  setChecked("multiSessionEnabled", !!a.multiSessionEnabled); sessions=JSON.parse(JSON.stringify(a.sessions||[])); renderSessions();
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
   setVal("status", "draft");
@@ -273,6 +277,16 @@ function copyActivity(id){
   feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
   attachments = JSON.parse(JSON.stringify(a.attachments || []));
   renderAttachments(); renderTagSelect(a.tags || [], a.certificationTag || ""); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
+}
+
+
+function renderSessions(){
+  const box=$("sessionsBox"); if(!box)return;
+  box.innerHTML=sessions.length?sessions.map((x,i)=>`<div class="field-item session-editor-row"><input class="field session-date" data-i="${i}" type="date" value="${esc(x.date||"")}"><input class="field session-start" data-i="${i}" type="time" value="${esc(x.startTime||"")}"><span>至</span><input class="field session-end" data-i="${i}" type="time" value="${esc(x.endTime||"")}"><button type="button" class="ghost-btn danger-btn session-remove" data-i="${i}">移除</button></div>`).join(""):'<div class="empty">尚未新增場次。</div>';
+  document.querySelectorAll('.session-date').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].date=el.value);
+  document.querySelectorAll('.session-start').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].startTime=el.value);
+  document.querySelectorAll('.session-end').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].endTime=el.value);
+  document.querySelectorAll('.session-remove').forEach(el=>el.onclick=()=>{sessions.splice(+el.dataset.i,1);renderSessions()});
 }
 
 function renderMealOptions(){
@@ -404,6 +418,7 @@ function renderRegFields(){
           <option value="text" ${f.type==="text"?"selected":""}>簡答</option>
           <option value="textarea" ${f.type==="textarea"?"selected":""}>段落</option>
           <option value="radio" ${f.type==="radio"?"selected":""}>單選</option>
+          <option value="checkbox" ${f.type==="checkbox"?"selected":""}>複選</option>
           <option value="imageRadio" ${f.type==="imageRadio"?"selected":""}>圖片單選</option>
         </select>
         <button type="button" class="ghost-btn reg-remove" data-i="${i}">移除</button>
@@ -653,6 +668,8 @@ async function saveActivity(event){
     activityTime: checked("activityTimeSame") ? joinTimeRange(val("plannedStartTime"), val("plannedEndTime")) : joinTimeRange(val("activityStartTime"), val("activityEndTime")),
     time: joinTimeRange(val("plannedStartTime"), val("plannedEndTime")),
     location: val("location").trim(),
+    multiSessionEnabled: checked("multiSessionEnabled"),
+    sessions: sessions.filter(x=>x.date).map((x,i)=>({...x,id:x.id||`session_${Date.now()}_${i}`})),
     certificationTag: getSelectedCertificationTag(),
     tags: [...new Set(getSelectedTags())],
     description: val("description").trim(),
@@ -733,17 +750,20 @@ function downloadQrA4(url, title){
   const w = window.open("", "_blank"); w.document.write(html); w.document.close();
 }
 
+function sessionLabel(a,id){const x=typeof id==="object"?id:(a.sessions||[]).find(s=>s.id===id);return x?`${x.date||""} ${x.startTime||""}${x.endTime?`～${x.endTime}`:""}`.trim():String(id||"")}
+
 async function viewRegistrations(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
   const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
   const custom = a.registerFields || [];
   const table = rows.length ? `<table class="data-table">
-    <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th><th>餐點</th>${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${custom.map(f=>`<td>${esc(r.customAnswers?.[f.label]||"")}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
+    <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th><th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
   $("modal")?.classList.remove("hidden");
+  document.querySelectorAll(".assigned-session-select").forEach(el=>el.onchange=async()=>{await updateDoc(doc(db,"activities",el.dataset.activity,"registrations",el.dataset.reg),{assignedSession:el.value,updatedAt:serverTimestamp()});});
 }
 
 async function lookupStudentActivities(){
@@ -890,7 +910,7 @@ async function viewFeedbacks(id){
   const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
   const qs = a.feedbackQuestions || [];
   const textQs = a.feedbackTextQuestions || [];
-  const table = rows.length ? `<table class="data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}${textQs.map(q=>`<th>${esc(q.label)}</th>`).join("")}<th>心得</th><th>操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}${textQs.map(q=>`<td>${esc(r.textAnswers?.[q.label]||"")}</td>`).join("")}<td>${esc(r.comment||"")}</td><td><button class="ghost-btn" data-edit-fb="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table>` : '<div class="empty">目前沒有人填寫回饋</div>';
+  const table = rows.length ? `<div class="data-table-scroll"><table class="data-table feedback-data-table"><thead><tr><th>#</th><th>姓名</th><th>學號</th>${qs.map(q=>`<th>${esc(q)}</th>`).join("")}${textQs.map(q=>`<th>${esc(q.label)}</th>`).join("")}<th class="long-text-cell">心得</th><th class="sticky-action">操作</th></tr></thead><tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.studentId)}</td>${qs.map(q=>`<td>${esc(r.ratings?.[q]||"")}</td>`).join("")}${textQs.map(q=>`<td class="long-text-cell">${esc(r.textAnswers?.[q.label]||"")}</td>`).join("")}<td class="long-text-cell">${esc(r.comment||"")}</td><td class="sticky-action"><button class="ghost-btn" data-edit-fb="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-fb="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">目前沒有人填寫回饋</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜回饋資料 <span class="quick-count">${rows.length} 份</span></h2>${table}<p><button class="primary-btn" data-export-fbs="${id}">下載回饋資料</button></p>`);
   $("modal")?.classList.remove("hidden");
 }
@@ -1075,6 +1095,9 @@ async function exportFeedbackWord(id){
   const week = weekdayText(a.date);
   const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(displayPlannedTime(a))}`;
   const headerLine = `${esc(a.academicYear || "")}學年度第 ${esc(a.semester || "")} 學期明新科技大學　學務處健康與諮商中心資源教室`;
+  const scoreMap={"非常滿意":5,"滿意":4,"普通":3,"不滿意":2,"非常不滿意":1};
+  const questionAverages=qs.map(q=>{const vals=rows.map(r=>scoreMap[r.ratings?.[q]]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null});
+  const overallVals=questionAverages.filter(Number.isFinite); const overallAverage=overallVals.length?overallVals.reduce((a,b)=>a+b,0)/overallVals.length:null;
   const tableRows = qs.map((q,i)=>{
     const cells = likertOptions.map(o=>{
       const count = rows.filter(r=>r.ratings?.[q]===o).length;
@@ -1110,6 +1133,7 @@ async function exportFeedbackWord(id){
   <p class="meta">活動地點：${esc(a.location||"")}</p>
   <h2>一、活動滿意度</h2>
   <table><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table>
+  <h2>二、李克特五點尺度平均</h2><table><tr><th>題目</th><th>平均分數</th></tr>${qs.map((q,i)=>`<tr><td>${i+1}. ${esc(q)}</td><td>${questionAverages[i]===null?"無資料":questionAverages[i].toFixed(2)}</td></tr>`).join("")}<tr><th>整體平均</th><th>${overallAverage===null?"無資料":overallAverage.toFixed(2)}</th></tr></table>
   ${textBlocks}
   <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
   </div></body></html>`;
@@ -1645,6 +1669,7 @@ bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({la
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
 $("feedbackEssayDefault")?.addEventListener("change", toggleFeedbackEssayQuestion);
 $("feedbackEssayCustom")?.addEventListener("change", toggleFeedbackEssayQuestion);
+bindClick("addSessionBtn", e=>{e.preventDefault();sessions.push({id:`session_${Date.now()}_${sessions.length}`,date:val("date"),startTime:"",endTime:""});renderSessions();});
 bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
 bindClick("uploadAttachmentBtn", e => { e.preventDefault(); uploadAttachment(); });
 bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({name:"附件", url:""}); renderAttachments(); });

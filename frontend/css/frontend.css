@@ -46,3 +46,6 @@
   .activity-poster-section{margin-top:18px}
   .activity-poster-link{border-radius:14px}
 }
+
+.toolbar{grid-template-columns:1fr 180px 180px}.activity-desc{white-space:pre-line;overflow-wrap:anywhere}.term-badge{display:inline-flex;width:max-content;padding:5px 10px;border-radius:999px;background:#eef6ff;font-weight:800;color:#0369a1}.session-summary{display:grid;gap:5px;margin:12px 0;padding:12px;border-radius:14px;background:#f8fbff}.session-summary span{display:block}.session-choice-list{padding:8px 12px;border:1px solid #dbeafe;border-radius:14px;margin-bottom:16px}
+@media(max-width:900px){.toolbar{grid-template-columns:1fr}}
