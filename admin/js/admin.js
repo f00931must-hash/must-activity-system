@@ -1121,12 +1121,12 @@ async function exportFeedbackWord(id){
     h2{font-size:12pt;margin:10pt 0 5pt;font-family:'DFKai-SB','標楷體','BiauKai',serif}
     .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.2;white-space:nowrap}
     .meta{font-size:12pt;margin:4pt 0}
-    table{border-collapse:collapse;width:100%;font-size:12pt;table-layout:fixed}
+    table{border-collapse:collapse;width:19cm;font-size:12pt;table-layout:fixed;margin-left:auto;margin-right:auto;mso-table-layout-alt:fixed}
     td,th{border:1px solid #333;padding:4pt;vertical-align:middle;text-align:center;font-size:12pt;word-wrap:break-word}
     th{font-weight:bold;text-align:center}
-    .item{text-align:center;width:14.2857%}
-    .item-head{text-align:center;width:14.2857%}
-    .average-cell{width:14.2857%;text-align:center;font-weight:bold}
+    .item,.item-head{width:4cm;text-align:center}
+    .score-cell,.average-cell{width:2.5cm;text-align:center}
+    .average-cell{font-weight:bold}
     .overall-row th,.overall-row td{background:#f2f2f2;font-weight:bold}
     p{margin:5pt 0}
   </style></head><body><div class="WordSection1">
@@ -1136,7 +1136,7 @@ async function exportFeedbackWord(id){
   <p class="meta">主　　題：${esc(a.title)}</p>
   <p class="meta">活動地點：${esc(a.location||"")}</p>
   <h2>一、活動滿意度</h2>
-  <table><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}<th class="average-cell">李克特量表平均</th></tr>${tableRows}${overallRow}</table>
+  <table width="718" style="width:19cm;table-layout:fixed"><colgroup><col width="151" style="width:4cm">${likertOptions.map(()=>`<col width="94" style="width:2.5cm">`).join("")}<col width="94" style="width:2.5cm"></colgroup><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th class="score-cell">${o}</th>`).join("")}<th class="average-cell">李克特量表平均</th></tr>${tableRows}${overallRow}</table>
   ${textBlocks}
   <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
   </div></body></html>`;
