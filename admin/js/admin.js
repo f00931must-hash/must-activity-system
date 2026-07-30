@@ -107,7 +107,7 @@ function card(a){
   const regUrl = siteConfig.baseUrl + "frontend/activity.html?id=" + a.id;
   const fbUrl = siteConfig.baseUrl + "frontend/feedback.html?id=" + a.id;
   const capText = Number(a.capacity || 0) > 0 ? `${a.registeredCount||0}/${a.capacity}` : `${a.registeredCount||0}/不限`;
-  const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "未設定";
+  const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "—";
   return `<article class="activity-admin-card">
     <div class="activity-card-main">
       <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([a.certificationTag, ...(a.tags || [])].filter(Boolean))}</div></div>
@@ -1103,8 +1103,10 @@ async function exportFeedbackWord(id){
       const count = rows.filter(r=>r.ratings?.[q]===o).length;
       return `<td>${round(count/total*100)}%</td>`;
     }).join("");
-    return `<tr><td class="item">${i+1}. ${esc(q)}</td>${cells}</tr>`;
+    const avg = questionAverages[i]===null ? "無資料" : questionAverages[i].toFixed(2);
+    return `<tr><td class="item">${i+1}. ${esc(q)}</td>${cells}<td class="average-cell">${avg}</td></tr>`;
   }).join("");
+  const overallRow = `<tr class="overall-row"><th class="item">整體平均</th><td colspan="${likertOptions.length}"></td><th class="average-cell">${overallAverage===null?"無資料":overallAverage.toFixed(2)}</th></tr>`;
   const textBlocks = textQs.map((q, qi)=>{
     const answers = rows.map((r,i)=>r.textAnswers?.[q.label] ? `<p>(${i+1}) ${esc(r.textAnswers[q.label])}</p>` : "").join("");
     return `<h2>${qs.length + qi + 1}. ${esc(q.label)}</h2>${answers || "<p>無填答資料</p>"}`;
@@ -1122,8 +1124,10 @@ async function exportFeedbackWord(id){
     table{border-collapse:collapse;width:100%;font-size:12pt}
     td,th{border:1px solid #333;padding:4pt;vertical-align:middle;font-size:12pt}
     th{font-weight:bold;text-align:center}
-    .item{text-align:justify;text-justify:inter-ideograph;width:48%}
+    .item{text-align:justify;text-justify:inter-ideograph;width:40%}
     .item-head{text-align:justify;text-align-last:justify;text-justify:inter-ideograph}
+    .average-cell{width:9%;text-align:center;font-weight:bold;white-space:nowrap}
+    .overall-row th,.overall-row td{background:#f2f2f2;font-weight:bold}
     p{margin:5pt 0}
   </style></head><body><div class="WordSection1">
   <div class="top">${headerLine}</div>
@@ -1132,8 +1136,7 @@ async function exportFeedbackWord(id){
   <p class="meta">主　　題：${esc(a.title)}</p>
   <p class="meta">活動地點：${esc(a.location||"")}</p>
   <h2>一、活動滿意度</h2>
-  <table><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}</tr>${tableRows}</table>
-  <h2>二、李克特五點尺度平均</h2><table><tr><th>題目</th><th>平均分數</th></tr>${qs.map((q,i)=>`<tr><td>${i+1}. ${esc(q)}</td><td>${questionAverages[i]===null?"無資料":questionAverages[i].toFixed(2)}</td></tr>`).join("")}<tr><th>整體平均</th><th>${overallAverage===null?"無資料":overallAverage.toFixed(2)}</th></tr></table>
+  <table><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th>${o}</th>`).join("")}<th class="average-cell">平均</th></tr>${tableRows}${overallRow}</table>
   ${textBlocks}
   <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
   </div></body></html>`;

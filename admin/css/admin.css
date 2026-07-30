@@ -35,7 +35,7 @@
 }
 .activity-info-grid{
   display:grid;
-  grid-template-columns:repeat(5, minmax(120px,1fr));
+  grid-template-columns:repeat(3, minmax(0,1fr));
   gap:10px;
   margin:12px 0;
 }
@@ -52,8 +52,13 @@
   margin-bottom:5px;
 }
 .activity-info-grid span{
+  display:block;
+  min-width:0;
+  overflow-wrap:anywhere;
   word-break:break-word;
 }
+.activity-card-main{min-width:0;overflow:hidden}
+.activity-admin-card{min-width:0;max-width:100%;box-sizing:border-box}
 .activity-desc{
   line-height:1.7;
   background:#fafafa;
