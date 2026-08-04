@@ -127,6 +127,7 @@ function card(a){
       <button class="ghost-btn" data-copy="${fbUrl}">複製回饋連結</button>
       <button class="ghost-btn" data-qrprint="${fbUrl}" data-title="${esc(a.title)} 回饋 QR">下載回饋QR A4</button>
       <button class="ghost-btn" data-view-regs="${a.id}">查看報名名單</button>
+      ${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${a.id}">保險名單</button>` : ""}
       <button class="ghost-btn" data-view-fbs="${a.id}">查看回饋資料</button>
       <button class="ghost-btn" data-export-word="${a.id}">下載成果Word</button>
       <button class="ghost-btn" data-copy-activity="${a.id}">複製活動</button>
@@ -160,6 +161,8 @@ function resetForm(){
   setChecked("showDepartment", true);
   setChecked("showPhone", true);
   setChecked("showBiologicalSex", true);
+  setChecked("showBirthDate", false);
+  setChecked("showNationalId", false);
   setChecked("enableMeal", true);
   mealOptions = ["葷","素","不用餐"];
   renderMealOptions();
@@ -209,6 +212,8 @@ function editActivity(id){
   setChecked("showDepartment", fixed.department !== false);
   setChecked("showPhone", fixed.phone !== false);
   setChecked("showBiologicalSex", fixed.biologicalSex !== false);
+  setChecked("showBirthDate", fixed.birthDate === true);
+  setChecked("showNationalId", fixed.nationalId === true);
   setChecked("enableMeal", a.enableMeal !== false);
   mealOptions = a.mealOptions || ["葷","素","不用餐"];
   renderMealOptions();
@@ -259,6 +264,8 @@ function copyActivity(id){
   setChecked("showDepartment", copyFixed.department !== false);
   setChecked("showPhone", copyFixed.phone !== false);
   setChecked("showBiologicalSex", copyFixed.biologicalSex !== false);
+  setChecked("showBirthDate", copyFixed.birthDate === true);
+  setChecked("showNationalId", copyFixed.nationalId === true);
   setChecked("enableMeal", a.enableMeal !== false);
   mealOptions = a.mealOptions || ["葷","素","不用餐"];
   renderMealOptions();
@@ -680,7 +687,9 @@ async function saveActivity(event){
       studentId: checked("showStudentId"),
       department: checked("showDepartment"),
       phone: checked("showPhone"),
-      biologicalSex: checked("showBiologicalSex")
+      biologicalSex: checked("showBiologicalSex"),
+      birthDate: checked("showBirthDate"),
+      nationalId: checked("showNationalId")
     },
     enableMeal: checked("enableMeal"),
     mealOptions: mealOptions.filter(Boolean),
@@ -752,14 +761,23 @@ function downloadQrA4(url, title){
 
 function sessionLabel(a,id){const x=typeof id==="object"?id:(a.sessions||[]).find(s=>s.id===id);return x?`${x.date||""} ${x.startTime||""}${x.endTime?`～${x.endTime}`:""}`.trim():String(id||"")}
 
+function maskNationalId(value){
+  const v=String(value||"").trim();
+  if(!v) return "";
+  if(v.length <= 5) return v[0] + "*".repeat(Math.max(0,v.length-1));
+  return v.slice(0,3) + "*".repeat(Math.max(3,v.length-6)) + v.slice(-3);
+}
+
 async function viewRegistrations(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
-  const rows = snap.docs.map(d=>({docId:d.id,...d.data()}));
+  const insuranceSnap = (a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? await getDocs(collection(db, "activities", id, "insurance")) : null;
+  const insuranceMap = new Map((insuranceSnap?.docs || []).map(d=>[d.id,d.data()]));
+  const rows = snap.docs.map(d=>({docId:d.id,...d.data(),...(insuranceMap.get(d.id)||{})}));
   const custom = a.registerFields || [];
   const table = rows.length ? `<table class="data-table">
-    <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th><th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
-    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td><td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
+    <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th>${a.fixedFields?.birthDate?"<th>出生年月日</th>":""}${a.fixedFields?.nationalId?"<th>身分證字號</th>":""}<th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
+    <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td>${a.fixedFields?.birthDate?`<td>${esc(r.birthDate||"")}</td>`:""}${a.fixedFields?.nationalId?`<td>${esc(maskNationalId(r.nationalId||""))}</td>`:""}<td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
   setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
   $("modal")?.classList.remove("hidden");
@@ -904,6 +922,28 @@ async function exportRegistrations(id){
   downloadFile((a.title || "活動") + "_簽到表.doc", html, "application/msword");
 }
 
+async function exportInsuranceList(id){
+  const a = activities.find(x=>x.id===id);
+  if(!a) return alert("找不到活動資料。");
+  if(!(a.fixedFields?.birthDate && a.fixedFields?.nationalId)){
+    return alert("保險名單需要同時開啟「出生年月日」與「身分證字號」固定欄位。請先修改活動設定。");
+  }
+  const regSnap = await getDocs(collection(db, "activities", id, "registrations"));
+  const insuranceSnap = await getDocs(collection(db, "activities", id, "insurance"));
+  const insuranceMap = new Map(insuranceSnap.docs.map(d=>[d.id,d.data()]));
+  const rows = regSnap.docs.map(d=>({docId:d.id,...d.data(),...(insuranceMap.get(d.id)||{})}));
+  if(!rows.length) return alert("目前沒有報名資料可匯出。");
+  const missing = rows.filter(r=>!String(r.birthDate||"").trim() || !String(r.nationalId||"").trim());
+  if(missing.length && !confirm(`有 ${missing.length} 筆報名資料缺少出生年月日或身分證字號，仍要下載保險名單嗎？`)) return;
+  const roc = rocDateText(a.date).replace(/\s+/g, "").replace(/年/g,"/").replace(/月/g,"/").replace(/日/g,"");
+  const week = weekdayText(a.date).replace("星期","");
+  const plan = displayPlannedTime(a).replace(/-/g,"~");
+  const title = `${roc}${week ? `（${week}）` : ""}${plan ? ` ${plan}` : ""}`;
+  const body = rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||"")}</td><td style="mso-number-format:'\\@'">${esc(r.nationalId||"")}</td><td style="mso-number-format:'\\@'">${esc(r.birthDate||"")}</td></tr>`).join("");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse;font-family:'Microsoft JhengHei',sans-serif}td,th{border:1px solid #000;padding:6px 10px;text-align:center}.title{font-size:16pt;font-weight:bold}</style></head><body><table><tr><th class="title" colspan="4">${esc(title)}</th></tr><tr><th>編號</th><th>姓名</th><th>身分證字號</th><th>出生年月日</th></tr>${body}</table></body></html>`;
+  downloadFile(`${a.title||"活動"}_保險名單.xls`, "\ufeff"+html, "application/vnd.ms-excel;charset=utf-8");
+}
+
 async function viewFeedbacks(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "feedbacks"));
@@ -920,7 +960,11 @@ async function editRegistration(activityId, studentId){
   if(!a) return alert("找不到活動資料。");
   const snap = await getDoc(doc(db, "activities", activityId, "registrations", studentId));
   if(!snap.exists()) return alert("找不到這筆報名資料。");
-  const r = snap.data();
+  let r = snap.data();
+  if(a.fixedFields?.birthDate || a.fixedFields?.nationalId){
+    const insuranceSnap = await getDoc(doc(db, "activities", activityId, "insurance", studentId));
+    if(insuranceSnap.exists()) r = {...r, ...insuranceSnap.data()};
+  }
   const custom = a.registerFields || [];
 
   const customRows = custom.map(f => {
@@ -957,6 +1001,8 @@ async function editRegistration(activityId, studentId){
         <option value="男" ${r.biologicalSex==="男"?"selected":""}>男</option>
         <option value="女" ${r.biologicalSex==="女"?"selected":""}>女</option>
       </select>
+      ${a.fixedFields?.birthDate ? `<label>出生年月日（民國年）</label><input class="field" name="birthDate" value="${esc(r.birthDate || "")}">` : ""}
+      ${a.fixedFields?.nationalId ? `<label>身分證字號</label><input class="field" name="nationalId" value="${esc(r.nationalId || "")}" autocomplete="off">` : ""}
       <label>餐點</label>${mealInput}
       ${customRows}
       <div class="modal-actions">
@@ -982,6 +1028,14 @@ async function editRegistration(activityId, studentId){
       customAnswers,
       updatedAt: serverTimestamp()
     });
+    if(a.fixedFields?.birthDate || a.fixedFields?.nationalId){
+      await setDoc(doc(db, "activities", activityId, "insurance", studentId), {
+        name: fd.get("name") || "",
+        birthDate: a.fixedFields?.birthDate ? (fd.get("birthDate") || "") : (r.birthDate || ""),
+        nationalId: a.fixedFields?.nationalId ? String(fd.get("nationalId") || "").trim().toUpperCase() : (r.nationalId || ""),
+        updatedAt: serverTimestamp()
+      }, {merge:true});
+    }
     await writeAudit("修改", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${fd.get("name") || studentId}`, "修改報名者資料");
     alert("報名資料已修改。");
     viewRegistrations(activityId);
@@ -1063,6 +1117,7 @@ async function syncActivitySubcollectionCount(activityId, subcollectionName, cou
 async function deleteRegistration(activityId, studentId){
   if(!confirm("確定刪除此報名資料？")) return;
   await deleteDoc(doc(db, "activities", activityId, "registrations", studentId));
+  try{ await deleteDoc(doc(db, "activities", activityId, "insurance", studentId)); }catch(e){ console.warn("刪除保險資料時略過：", e); }
   const remainingCount = await syncActivitySubcollectionCount(activityId, "registrations", "registeredCount");
   await writeAudit("刪除", "報名資料", `${activities.find(x=>x.id===activityId)?.title || activityId}／${studentId}`, `刪除報名資料，剩餘 ${remainingCount} 人`);
   await viewRegistrations(activityId);
@@ -1716,6 +1771,9 @@ document.addEventListener("click", async (e) => {
 
   const regs = e.target.closest("[data-export-regs]");
   if(regs) return exportRegistrations(regs.dataset.exportRegs);
+
+  const insurance = e.target.closest("[data-export-insurance]");
+  if(insurance) return exportInsuranceList(insurance.dataset.exportInsurance);
 
   const fbs = e.target.closest("[data-export-fbs]");
   if(fbs) return exportFeedbacks(fbs.dataset.exportFbs);

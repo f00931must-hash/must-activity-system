@@ -38,6 +38,12 @@ service cloud.firestore {
         allow list, update, delete: if isAdmin();
       }
 
+      // 保險敏感資料與一般報名資料分開保存：學生只可建立，只有管理者可讀取/修改/刪除。
+      match /insurance/{studentId} {
+        allow create: if true;
+        allow read, update, delete: if isAdmin();
+      }
+
       match /feedbacks/{studentId} {
         allow create: if true;
         allow get: if true;

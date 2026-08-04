@@ -1,6 +1,6 @@
 
 import { db } from "../../shared/js/firebase-app.js";
-import { collection, doc, getDoc, getDocs, setDoc, updateDoc, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc, increment, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const $ = id => document.getElementById(id);
 const id = new URLSearchParams(location.search).get("id");
@@ -26,6 +26,8 @@ function fixedFields(){
     department: f.department !== false,
     phone: f.phone !== false,
     biologicalSex: f.biologicalSex !== false,
+    birthDate: f.birthDate === true,
+    nationalId: f.nationalId === true,
     meal: activity.enableMeal !== false
   };
 }
@@ -76,6 +78,8 @@ function renderForm(){
       ${ff.biologicalSex ? `<label>生理性別 *</label>
         <label class="radio-row"><input type="radio" name="biologicalSex" value="男" required> 男</label>
         <label class="radio-row"><input type="radio" name="biologicalSex" value="女"> 女</label>` : ""}
+      ${ff.birthDate ? `<label>出生年月日（民國年） *</label><input class="field" name="birthDate" placeholder="例如：94/5/20" inputmode="numeric" required>` : ""}
+      ${ff.nationalId ? `<label>身分證字號 *</label><input class="field" name="nationalId" placeholder="例如：A123456789" autocomplete="off" maxlength="20" required>` : ""}
       ${ff.meal ? mealHtml() : ""}
       ${sessionFieldsHtml()}
       ${(activity.registerFields || []).map(fieldHtml).join("")}
@@ -159,7 +163,8 @@ async function submitForm(e){
   }
 
   try{
-    await setDoc(regRef, {
+    const batch = writeBatch(db);
+    batch.set(regRef, {
       name: fd.get("name"),
       normalizedName,
       studentId: ff.studentId ? studentIdKey : "",
@@ -172,7 +177,16 @@ async function submitForm(e){
       assignedSession: "",
       createdAt: serverTimestamp()
     });
-    await updateDoc(doc(db, "activities", id), { registeredCount: increment(1) });
+    if(ff.birthDate || ff.nationalId){
+      batch.set(doc(db, "activities", id, "insurance", studentIdKey), {
+        name: fd.get("name"),
+        birthDate: ff.birthDate ? String(fd.get("birthDate") || "").trim() : "",
+        nationalId: ff.nationalId ? String(fd.get("nationalId") || "").trim().toUpperCase() : "",
+        createdAt: serverTimestamp()
+      });
+    }
+    batch.update(doc(db, "activities", id), { registeredCount: increment(1) });
+    await batch.commit();
     $("registerPanel").innerHTML = '<div class="success"><h2>報名完成！</h2><p>謝謝你的填寫。</p></div>';
   }catch(err){
     console.error(err);
