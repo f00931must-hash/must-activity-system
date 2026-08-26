@@ -5,7 +5,7 @@ let activities=[];
 init();
 async function init(){
  try{
-  const snap=await getDocs(query(collection(db,"activities"),orderBy("date","desc")));
+  const snap=await getDocs(query(collection(db,"activities"),orderBy("date","asc")));
   activities=snap.docs.map(d=>({id:d.id,...d.data()})).filter(a=>a.published!==false&&a.status!=="draft");
   buildSemesterFilter(); bindEvents(); renderActivities();
  }catch(err){ console.error(err); $("activityList").innerHTML=`<div class="empty">活動載入失敗：${esc(err.message)}</div>`; }
