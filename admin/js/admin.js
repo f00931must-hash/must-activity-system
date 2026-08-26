@@ -1135,7 +1135,8 @@ async function exportFeedbacks(id){
   const snap = await getDocs(collection(db, "activities", id, "feedbacks"));
   const rows = snap.docs.map(d=>d.data());
   const textQs = a.feedbackTextQuestions || [];
-  const headers = ["姓名","學號",...(a.feedbackQuestions||[]),...textQs.map(q=>q.label),"心得"];
+  const essayQuestion = a.feedbackEssayQuestion || "參與活動後，我的心得與感想";
+  const headers = ["姓名","學號",...(a.feedbackQuestions||[]),...textQs.map(q=>q.label),essayQuestion];
   const data = rows.map(r => [r.name,r.studentId,...(a.feedbackQuestions||[]).map(q=>r.ratings?.[q]||""),...textQs.map(q=>r.textAnswers?.[q.label]||""),r.comment]);
   downloadCsv(a.title+"_回饋資料.csv", [headers,...data]);
 }
@@ -1193,7 +1194,7 @@ async function exportFeedbackWord(id){
   <h2>一、活動滿意度</h2>
   <table width="718" style="width:19cm;table-layout:fixed"><colgroup><col width="151" style="width:4cm">${likertOptions.map(()=>`<col width="94" style="width:2.5cm">`).join("")}<col width="94" style="width:2.5cm"></colgroup><tr><th class="item-head">項　目</th>${likertOptions.map(o=>`<th class="score-cell">${o}</th>`).join("")}<th class="average-cell">李克特量表平均</th></tr>${tableRows}${overallRow}</table>
   ${textBlocks}
-  <h2>${qs.length + textQs.length + 1}. 本次活動的心得及對你最大的幫助是什麼？</h2>${comments || "<p>無填答資料</p>"}
+  <h2>${qs.length + textQs.length + 1}. ${esc(a.feedbackEssayQuestion || "參與活動後，我的心得與感想")}</h2>${comments || "<p>無填答資料</p>"}
   </div></body></html>`;
   downloadFile(a.title+"_活動回饋表.doc", html, "application/msword");
 }
