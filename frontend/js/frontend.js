@@ -28,10 +28,23 @@ function sessionSummary(a){
 function activityCard(a){
  const cap=Number(a.capacity||0),reg=Number(a.registeredCount||0),capText=cap>0?`${reg}/${cap}`:`${reg}/不限`;
  const term=a.academicYear&&a.semester?`${a.academicYear}-${a.semester}`:"未設定學期";
- return `<article class="activity-card"><div class="activity-head"><div class="status-tags"><span class="badge">${esc(statusText(a.status))}</span>${tagHtml([a.certificationTag,...(a.tags||[])].filter(Boolean))}</div><div class="term-badge">${esc(term)}</div><h2>${esc(a.title||"未命名活動")}</h2></div><div class="activity-meta"><div><strong>日期</strong><span>${esc(a.date||"")}</span></div><div><strong>活動時間</strong><span>${esc(a.activityTime||a.plannedTime||a.time||"")}</span></div><div><strong>地點</strong><span>${esc(a.location||"")}</span></div><div><strong>報名</strong><span>${capText}</span></div></div>${sessionSummary(a)}${a.description?`<p class="activity-desc">${esc(a.description)}</p>`:""}${attachmentHtml(a.attachments||[])}<div class="activity-actions"><a class="primary-btn" href="activity.html?id=${encodeURIComponent(a.id)}">我要報名</a><a class="ghost-btn" href="feedback.html?id=${encodeURIComponent(a.id)}">填寫回饋</a></div></article>`;
+ return `<article class="activity-card"><div class="activity-head"><div class="status-tags"><span class="badge">${esc(activityStatusText(a))}</span>${tagHtml([a.certificationTag,...(a.tags||[])].filter(Boolean))}</div><div class="term-badge">${esc(term)}</div><h2>${esc(a.title||"未命名活動")}</h2></div><div class="activity-meta"><div><strong>日期</strong><span>${esc(a.date||"")}</span></div><div><strong>活動時間</strong><span>${esc(a.activityTime||a.plannedTime||a.time||"")}</span></div><div><strong>地點</strong><span>${esc(a.location||"")}</span></div><div><strong>報名</strong><span>${capText}</span></div></div>${sessionSummary(a)}${a.description?`<p class="activity-desc">${esc(a.description)}</p>`:""}${attachmentHtml(a.attachments||[])}<div class="activity-actions"><a class="primary-btn" href="activity.html?id=${encodeURIComponent(a.id)}">我要報名</a><a class="ghost-btn" href="feedback.html?id=${encodeURIComponent(a.id)}">填寫回饋</a></div></article>`;
 }
 function attachmentHtml(files){return files?.length?`<div class="attachment-list compact-attachments">${files.map((f,i)=>`<a href="${esc(f.url||"#")}" target="_blank" rel="noopener">📎 附件${files.length>1?i+1:""}</a>`).join("")}</div>`:""}
-function statusText(s){return{open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s]||s||"活動"}
+function activityStatusText(a){
+ if(a.status!=="open")return{feedback:"回饋中",closed:"已結束",draft:"草稿"}[a.status]||a.status||"活動";
+ const now=Date.now(),openAt=parseLocalTime(a.registerOpenAt),closeAt=parseLocalTime(a.registerCloseAt);
+ if(openAt&&now<openAt)return"尚未開放";
+ if(closeAt&&now>closeAt)return"報名已截止";
+ const cap=Number(a.capacity||0),reg=Number(a.registeredCount||0);
+ if(cap>0&&reg>=cap)return"已額滿";
+ return"報名中";
+}
+function parseLocalTime(value){
+ if(!value)return null;
+ const t=new Date(value).getTime();
+ return Number.isNaN(t)?null:t;
+}
 function tagColorClass(tag){const c=["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];let n=0;String(tag||"").split("").forEach(x=>n+=x.charCodeAt(0));return c[n%c.length]}
 function tagHtml(tags){const u=[...new Set((tags||[]).filter(Boolean))];return u.length?`<div class="tag-row">${u.map(t=>`<span class="tag ${tagColorClass(t)}">${esc(t)}</span>`).join("")}</div>`:""}
 function esc(v){return String(v||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
