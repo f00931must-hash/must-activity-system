@@ -29,6 +29,8 @@ let unsubscribe = null;
 const defaultFb = [];
 
 const likertOptions = ["非常滿意","滿意","普通","不滿意","非常不滿意"];
+const MULTI_SESSION_LOCATION_TEXT = "請依報名場次查看活動地點";
+let singleLocationBackup = "";
 
 function val(id){ return $(id)?.value ?? ""; }
 function checked(id){ return !!$(id)?.checked; }
@@ -289,11 +291,12 @@ function copyActivity(id){
 
 function renderSessions(){
   const box=$("sessionsBox"); if(!box)return;
-  box.innerHTML=sessions.length?sessions.map((x,i)=>`<div class="field-item session-editor-row"><input class="field session-date" data-i="${i}" type="date" value="${esc(x.date||"")}"><input class="field session-start" data-i="${i}" type="time" value="${esc(x.startTime||"")}"><span>至</span><input class="field session-end" data-i="${i}" type="time" value="${esc(x.endTime||"")}"><button type="button" class="ghost-btn danger-btn session-remove" data-i="${i}">移除</button></div>`).join(""):'<div class="empty">尚未新增場次。</div>';
-  document.querySelectorAll('.session-date').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].date=el.value);
-  document.querySelectorAll('.session-start').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].startTime=el.value);
-  document.querySelectorAll('.session-end').forEach(el=>el.oninput=()=>sessions[+el.dataset.i].endTime=el.value);
-  document.querySelectorAll('.session-remove').forEach(el=>el.onclick=()=>{sessions.splice(+el.dataset.i,1);renderSessions()});
+  box.innerHTML=sessions.length?sessions.map((x,i)=>`<div class="field-item session-editor-row"><input class="field session-date" data-i="${i}" type="date" value="${esc(x.date||"")}" aria-label="場次日期"><input class="field session-start" data-i="${i}" type="time" value="${esc(x.startTime||"")}" aria-label="開始時間"><span>至</span><input class="field session-end" data-i="${i}" type="time" value="${esc(x.endTime||"")}" aria-label="結束時間"><input class="field session-location" data-i="${i}" value="${esc(x.location||"")}" placeholder="本場次地點" aria-label="場次地點"><button type="button" class="ghost-btn danger-btn session-remove" data-i="${i}">移除此場次</button></div>`).join(""):'<div class="empty">尚未新增場次。</div>';
+  document.querySelectorAll(".session-date").forEach(el=>el.oninput=()=>sessions[+el.dataset.i].date=el.value);
+  document.querySelectorAll(".session-start").forEach(el=>el.oninput=()=>sessions[+el.dataset.i].startTime=el.value);
+  document.querySelectorAll(".session-end").forEach(el=>el.oninput=()=>sessions[+el.dataset.i].endTime=el.value);
+  document.querySelectorAll(".session-location").forEach(el=>el.oninput=()=>sessions[+el.dataset.i].location=el.value);
+  document.querySelectorAll(".session-remove").forEach(el=>el.onclick=()=>{sessions.splice(+el.dataset.i,1);renderSessions()});
 }
 
 function renderMealOptions(){
@@ -674,9 +677,9 @@ async function saveActivity(event){
     activityTimeSame: checked("activityTimeSame"),
     activityTime: checked("activityTimeSame") ? joinTimeRange(val("plannedStartTime"), val("plannedEndTime")) : joinTimeRange(val("activityStartTime"), val("activityEndTime")),
     time: joinTimeRange(val("plannedStartTime"), val("plannedEndTime")),
-    location: val("location").trim(),
+    location: checked("multiSessionEnabled") ? MULTI_SESSION_LOCATION_TEXT : val("location").trim(),
     multiSessionEnabled: checked("multiSessionEnabled"),
-    sessions: sessions.filter(x=>x.date).map((x,i)=>({...x,id:x.id||`session_${Date.now()}_${i}`})),
+    sessions: checked("multiSessionEnabled") ? sessions.filter(x=>x.date).map((x,i)=>({...x,location:String(x.location||"").trim(),id:x.id||`session_${Date.now()}_${i}`})) : [],
     certificationTag: getSelectedCertificationTag(),
     tags: [...new Set(getSelectedTags())],
     description: val("description").trim(),
@@ -710,6 +713,16 @@ async function saveActivity(event){
   if(!data.title || !data.date){
     alert("活動名稱和日期必填");
     return;
+  }
+  if(data.multiSessionEnabled){
+    if(!data.sessions.length){
+      alert("已啟用多場次報名，請至少新增一個場次。若是不小心按到，請按「刪除多場次設定」。");
+      return;
+    }
+    if(data.sessions.some(x=>!x.location)){
+      alert("請填寫每一個報名場次的地點。");
+      return;
+    }
   }
 
     const id = val("editId");
@@ -759,7 +772,7 @@ function downloadQrA4(url, title){
   const w = window.open("", "_blank"); w.document.write(html); w.document.close();
 }
 
-function sessionLabel(a,id){const x=typeof id==="object"?id:(a.sessions||[]).find(s=>s.id===id);return x?`${x.date||""} ${x.startTime||""}${x.endTime?`～${x.endTime}`:""}`.trim():String(id||"")}
+function sessionLabel(a,id){const x=typeof id==="object"?id:(a.sessions||[]).find(s=>s.id===id);return x?`${x.date||""} ${x.startTime||""}${x.endTime?`～${x.endTime}`:""}${x.location?`｜${x.location}`:""}`.trim():String(id||"")}
 
 function maskNationalId(value){
   const v=String(value||"").trim();
@@ -1728,7 +1741,33 @@ bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({la
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
 $("feedbackEssayDefault")?.addEventListener("change", toggleFeedbackEssayQuestion);
 $("feedbackEssayCustom")?.addEventListener("change", toggleFeedbackEssayQuestion);
-bindClick("addSessionBtn", e=>{e.preventDefault();sessions.push({id:`session_${Date.now()}_${sessions.length}`,date:val("date"),startTime:"",endTime:""});renderSessions();});
+bindClick("addSessionBtn", e=>{
+  e.preventDefault();
+  if(!checked("multiSessionEnabled")){
+    setChecked("multiSessionEnabled",true);
+    singleLocationBackup=val("location").trim();
+  }
+  setVal("location",MULTI_SESSION_LOCATION_TEXT);
+  sessions.push({id:`session_${Date.now()}_${sessions.length}`,date:val("date"),startTime:"",endTime:"",location:""});
+  renderSessions();
+});
+$("multiSessionEnabled")?.addEventListener("change",()=>{
+  if(checked("multiSessionEnabled")){
+    const current=val("location").trim();
+    if(current&&current!==MULTI_SESSION_LOCATION_TEXT)singleLocationBackup=current;
+    setVal("location",MULTI_SESSION_LOCATION_TEXT);
+  }else if(val("location").trim()===MULTI_SESSION_LOCATION_TEXT){
+    setVal("location",singleLocationBackup);
+  }
+});
+bindClick("deleteSessionsBtn",e=>{
+  e.preventDefault();
+  if(sessions.length&&!confirm("確定刪除全部多場次設定？"))return;
+  sessions=[];
+  setChecked("multiSessionEnabled",false);
+  if(val("location").trim()===MULTI_SESSION_LOCATION_TEXT)setVal("location",singleLocationBackup);
+  renderSessions();
+});
 bindClick("addFeedbackTextQuestionBtn", (e) => { e.preventDefault(); feedbackTextQuestions.push({label:"", type:"textarea", required:false}); renderFeedbackTextQuestions(); });
 bindClick("uploadAttachmentBtn", e => { e.preventDefault(); uploadAttachment(); });
 bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({name:"附件", url:""}); renderAttachments(); });
