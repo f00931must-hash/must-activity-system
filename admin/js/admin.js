@@ -154,6 +154,7 @@ function resetForm(){
   setVal("activityEndTime", "");
   toggleActivityTimeSame();
   setVal("location", "");
+  singleLocationBackup = "";
   setChecked("multiSessionEnabled", false); sessions=[]; renderSessions();
   setVal("description", "");
   setVal("capacity", 0);
@@ -204,6 +205,7 @@ function editActivity(id){
   setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
   setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
+  singleLocationBackup = (a.location && a.location !== MULTI_SESSION_LOCATION_TEXT) ? a.location : "";
   setChecked("multiSessionEnabled", !!a.multiSessionEnabled); sessions=JSON.parse(JSON.stringify(a.sessions||[])); renderSessions();
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
@@ -256,6 +258,7 @@ function copyActivity(id){
   setChecked("activityTimeSame", a.activityTimeSame !== false && (!a.activityTime || a.activityTime === a.plannedTime || a.activityTime === a.time));
   setVal("activityStartTime", actual[0]); setVal("activityEndTime", actual[1]); toggleActivityTimeSame();
   setVal("location", a.location || "");
+  singleLocationBackup = (a.location && a.location !== MULTI_SESSION_LOCATION_TEXT) ? a.location : "";
   setChecked("multiSessionEnabled", !!a.multiSessionEnabled); sessions=JSON.parse(JSON.stringify(a.sessions||[])); renderSessions();
   setVal("description", a.description || "");
   setVal("capacity", a.capacity || 0);
