@@ -37,6 +37,7 @@ function renderHeader(){
     <div class="status-tags"><span class="badge">${esc(activity.status || "活動")}</span>${tagHtml(activity.tags || [])}</div>
     <h1>${esc(activity.title)}</h1>
     <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
+    ${activity.multiSessionEnabled ? '<p class="multi-session-time-hint">請依照你選的報名時間</p>' : ""}
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
     <p class="activity-desc">${esc(activity.description || "")}</p>
     ${attachmentHtml(activity.attachments || [])}
@@ -152,9 +153,8 @@ async function submitForm(e){
   if(activity.multiSessionEnabled && !availableSessions.length){ $("msg").innerHTML = '<div class="error">請至少勾選一個可參加場次。</div>'; return; }
 
   const normalizedName = String(fd.get("name") || "").replace(/[\s　]+/g, "").trim();
-  const allRegs = await getDocs(collection(db, "activities", id, "registrations"));
-  const sameName = allRegs.docs.find(d => String(d.data().normalizedName || d.data().name || "").replace(/[\s　]+/g, "").trim() === normalizedName);
-  if(sameName){ $("msg").innerHTML = '<div class="error">此姓名已報名過本活動。若為同名同姓，請洽活動承辦老師確認。</div>'; return; }
+  // 未登入學生不可讀取整份報名名單；以學號文件 ID 檢查重複即可，
+  // 避免為了同名檢查而開放其他學生的個資。
   const regRef = doc(db, "activities", id, "registrations", studentIdKey);
   const existing = await getDoc(regRef);
   if(existing.exists()){
