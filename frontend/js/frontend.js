@@ -23,7 +23,7 @@ function renderActivities(){
 }
 function sessionSummary(a){
  if(!a.multiSessionEnabled||!(a.sessions||[]).length)return "";
- return `<div class="session-summary"><strong>可報名場次</strong>${a.sessions.map(s=>`<span>${esc(s.date||"")} ${esc(s.startTime||"")}${s.endTime?`～${esc(s.endTime)}`:""}</span>`).join("")}</div>`;
+ return `<div class="session-summary"><strong>可報名場次</strong>${a.sessions.map(s=>`<span>${esc(s.date||"")} ${esc(s.startTime||"")}${s.endTime?`～${esc(s.endTime)}`:""}${s.location?`｜地點：${esc(s.location)}`:""}</span>`).join("")}</div>`;
 }
 function activityCard(a){
  const cap=Number(a.capacity||0),reg=Number(a.registeredCount||0),capText=cap>0?`${reg}/${cap}`:`${reg}/不限`;
