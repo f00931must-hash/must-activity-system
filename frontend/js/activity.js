@@ -93,7 +93,7 @@ function renderForm(){
 
 function sessionFieldsHtml(){
   if(!activity.multiSessionEnabled || !(activity.sessions || []).length) return "";
-  return `<label>可參加場次 * <span class="hint-inline">（可複選）</span></label><div class="session-choice-list">${activity.sessions.map((s,i)=>{const label=`${s.date||""} ${s.startTime||""}${s.endTime?`～${s.endTime}`:""}`.trim();return `<label class="check-row"><input type="checkbox" name="availableSessions" value="${esc(s.id||String(i))}"> ${esc(label)}</label>`}).join("")}</div>`;
+  return `<label>可參加場次 * <span class="hint-inline">（可複選）</span></label><div class="session-choice-list">${activity.sessions.map((s,i)=>{const label=`${s.date||""} ${s.startTime||""}${s.endTime?`～${s.endTime}`:""}${s.location?`｜地點：${s.location}`:""}`.trim();return `<label class="check-row"><input type="checkbox" name="availableSessions" value="${esc(s.id||String(i))}"> ${esc(label)}</label>`}).join("")}</div>`;
 }
 function mealHtml(){
   const opts = (activity.mealOptions && activity.mealOptions.length) ? activity.mealOptions : ["葷","素","不用餐"];
