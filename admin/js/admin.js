@@ -115,7 +115,7 @@ function card(a){
       <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([a.certificationTag, ...(a.tags || [])].filter(Boolean))}</div></div>
       <div class="activity-info-grid">
         <div><strong>學期</strong><span>${esc(sem)}</span></div>
-        <div><strong>日期</strong><span>📅 ${esc(a.date||"")}</span></div>
+        <div><strong>日期</strong><span>📅 ${esc(activityDateText(a))}</span></div>
         <div><strong>活動時間</strong><span>${esc(displayActivityTime(a))}</span></div>
         <div><strong>地點</strong><span>📍 ${esc(a.location||"")}</span></div>
         <div><strong>報名</strong><span>${capText}</span></div>
@@ -147,6 +147,10 @@ function resetForm(){
   setVal("title", "");
   const dateEl = $("date");
   if(dateEl) dateEl.valueAsDate = new Date();
+  setChecked("dateModeSingle", true);
+  setChecked("dateModeMulti", false);
+  setVal("endDate", "");
+  toggleDateMode();
   setVal("plannedStartTime", "");
   setVal("plannedEndTime", "");
   setChecked("activityTimeSame", true);
@@ -199,6 +203,11 @@ function editActivity(id){
   setVal("semester", a.semester || "");
   setVal("title", a.title || "");
   setVal("date", a.date || "");
+  const isMultiDay = a.dateMode === "multi" && !!a.endDate;
+  setChecked("dateModeSingle", !isMultiDay);
+  setChecked("dateModeMulti", isMultiDay);
+  setVal("endDate", isMultiDay ? a.endDate : "");
+  toggleDateMode();
   const planned = splitTimeRange(a.plannedTime || a.time || "");
   const actual = splitTimeRange(a.activityTime || a.plannedTime || a.time || "");
   setVal("plannedStartTime", planned[0]); setVal("plannedEndTime", planned[1]);
@@ -252,6 +261,11 @@ function copyActivity(id){
   setVal("semester", a.semester || "");
   setVal("title", (a.title || "") + "（複製）");
   setVal("date", a.date || "");
+  const isMultiDay = a.dateMode === "multi" && !!a.endDate;
+  setChecked("dateModeSingle", !isMultiDay);
+  setChecked("dateModeMulti", isMultiDay);
+  setVal("endDate", isMultiDay ? a.endDate : "");
+  toggleDateMode();
   const planned = splitTimeRange(a.plannedTime || a.time || "");
   const actual = splitTimeRange(a.activityTime || a.plannedTime || a.time || "");
   setVal("plannedStartTime", planned[0]); setVal("plannedEndTime", planned[1]);
@@ -675,7 +689,9 @@ async function saveActivity(event){
     academicYear: val("academicYear").trim(),
     semester: val("semester"),
     title: val("title").trim(),
+    dateMode: checked("dateModeMulti") ? "multi" : "single",
     date: val("date"),
+    endDate: checked("dateModeMulti") ? val("endDate") : "",
     plannedTime: joinTimeRange(val("plannedStartTime"), val("plannedEndTime")),
     activityTimeSame: checked("activityTimeSame"),
     activityTime: checked("activityTimeSame") ? joinTimeRange(val("plannedStartTime"), val("plannedEndTime")) : joinTimeRange(val("activityStartTime"), val("activityEndTime")),
@@ -715,6 +731,14 @@ async function saveActivity(event){
 
   if(!data.title || !data.date){
     alert("活動名稱和日期必填");
+    return;
+  }
+  if(data.dateMode === "multi" && !data.endDate){
+    alert("多日活動請填寫結束日期。");
+    return;
+  }
+  if(data.dateMode === "multi" && data.endDate < data.date){
+    alert("結束日期不可早於開始日期。");
     return;
   }
   if(data.multiSessionEnabled){
@@ -867,10 +891,9 @@ async function exportRegistrations(id){
   const a = activities.find(x=>x.id===id);
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
   const rows = snap.docs.map(d=>d.data());
-  const week = weekdayText(a.date);
-  const rocDate = rocDateText(a.date);
   const planTime = displayPlannedTime(a);
-  const timeText = planTime ? `${rocDate}${week ? `（${week}）` : ""} ${esc(planTime)}` : `${rocDate}${week ? `（${week}）` : ""}`;
+  const rocActivityDate = activityRocDateWithWeekday(a);
+  const timeText = planTime ? `${rocActivityDate} ${esc(planTime)}` : rocActivityDate;
   const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期 健康與諮商中心`;
   const titleLine = `資源教室「${esc(a.title || "")}」活動簽到表`;
 
@@ -1164,8 +1187,7 @@ async function exportFeedbackWord(id){
   const qs = a.feedbackQuestions || [];
   const textQs = a.feedbackTextQuestions || [];
   const total = rows.length || 1;
-  const week = weekdayText(a.date);
-  const dateLine = `實施日期：${esc(a.date || "")}${week ? `（${week}）` : ""} ${esc(displayPlannedTime(a))}`;
+  const dateLine = `實施日期：${esc(activityDateWithWeekday(a))} ${esc(displayPlannedTime(a))}`;
   const headerLine = `${esc(a.academicYear || "")}學年度第 ${esc(a.semester || "")} 學期明新科技大學　學務處健康與諮商中心資源教室`;
   const scoreMap={"非常滿意":5,"滿意":4,"普通":3,"不滿意":2,"非常不滿意":1};
   const questionAverages=qs.map(q=>{const vals=rows.map(r=>scoreMap[r.ratings?.[q]]).filter(Number.isFinite);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null});
@@ -1345,7 +1367,7 @@ async function runCertificationQuery(){
     for(const a of chosen){
       const snap=await getDocs(collection(db,"activities",a.id,"registrations"));
       const match=snap.docs.find(d=>{const r=d.data(); const sid=String(r.studentId||"").trim().toUpperCase(); const name=String(r.name||"").trim(); return person.studentId?sid===String(person.studentId).trim().toUpperCase():name===String(person.name).trim();});
-      if(match && !isExcluded(term,selected,person,a.id)) attended.push({activityId:a.id,title:a.title||"未命名活動",date:a.date||"",registrationId:match.id});
+      if(match && !isExcluded(term,selected,person,a.id)) attended.push({activityId:a.id,title:a.title||"未命名活動",date:activityDateText(a),registrationId:match.id});
     }
     results.push({...person,activities:attended});
   }
@@ -1372,6 +1394,33 @@ function downloadCertificationExcel(){
   downloadFile(`認證時數_${latestCertificationRows[0].term}_${latestCertificationRows[0].category}.xls`,html,"application/vnd.ms-excel;charset=utf-8");
 }
 
+function activityDateText(a){
+  const start=String(a?.date||"");
+  return a?.dateMode==="multi"&&a?.endDate?`${start}～${a.endDate}`:start;
+}
+function activityDateWithWeekday(a){
+  const start=String(a?.date||"");
+  const startWeek=weekdayText(start);
+  const startText=`${start}${startWeek?`（${startWeek}）`:""}`;
+  if(a?.dateMode!=="multi"||!a?.endDate)return startText;
+  const endWeek=weekdayText(a.endDate);
+  return `${startText}～${a.endDate}${endWeek?`（${endWeek}）`:""}`;
+}
+function activityRocDateWithWeekday(a){
+  const start=String(a?.date||"");
+  const startWeek=weekdayText(start);
+  const startText=`${rocDateText(start)}${startWeek?`（${startWeek}）`:""}`;
+  if(a?.dateMode!=="multi"||!a?.endDate)return startText;
+  const endWeek=weekdayText(a.endDate);
+  return `${startText}～${rocDateText(a.endDate)}${endWeek?`（${endWeek}）`:""}`;
+}
+function toggleDateMode(){
+  const multi=checked("dateModeMulti");
+  $("endDateWrap")?.classList.toggle("hidden",!multi);
+  setText("startDateLabel",multi?"開始日期":"活動日期");
+  const end=$("endDate");
+  if(end)end.required=multi;
+}
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
 function round(n){ return Math.round(n*10)/10; }
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
@@ -1742,6 +1791,8 @@ bindClick("resetBtn", (e) => { e.preventDefault(); resetForm(); });
 bindClick("addMealOptionBtn", e => { e.preventDefault(); mealOptions.push(""); renderMealOptions(); });
 bindClick("addRegisterFieldBtn", (e) => { e.preventDefault(); regFields.push({label:"新題目", type:"text", required:false, options:[]}); renderRegFields(); });
 bindClick("addFeedbackQuestionBtn", (e) => { e.preventDefault(); fbQuestions.push(""); renderFbQuestions(); });
+$("dateModeSingle")?.addEventListener("change", toggleDateMode);
+$("dateModeMulti")?.addEventListener("change", toggleDateMode);
 $("feedbackEssayDefault")?.addEventListener("change", toggleFeedbackEssayQuestion);
 $("feedbackEssayCustom")?.addEventListener("change", toggleFeedbackEssayQuestion);
 bindClick("addSessionBtn", e=>{
