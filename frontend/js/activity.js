@@ -36,7 +36,7 @@ function renderHeader(){
   $("activityHeader").innerHTML = `
     <div class="status-tags"><span class="badge">${esc(activity.status || "活動")}</span>${tagHtml(activity.tags || [])}</div>
     <h1>${esc(activity.title)}</h1>
-    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
+    <div class="info-line"><strong>時間</strong><span>${esc(activityDateText(activity))} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
     ${activity.multiSessionEnabled ? '<p class="multi-session-time-hint">請依照你選的報名時間</p>' : ""}
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
     <p class="activity-desc">${esc(activity.description || "")}</p>
@@ -227,6 +227,11 @@ function attachmentHtml(files){
     </section>` : "";
 
   return posterHtml + attachmentListHtml;
+}
+
+function activityDateText(a){
+  const start=String(a?.date||"");
+  return a?.dateMode==="multi"&&a?.endDate?`${start}～${a.endDate}`:start;
 }
 
 function parseLocalTime(value){
