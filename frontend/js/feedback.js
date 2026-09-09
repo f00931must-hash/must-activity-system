@@ -23,7 +23,7 @@ function renderHeader(){
   $("activityHeader").innerHTML = `
     <span class="badge">活動回饋</span>
     <h1>${esc(activity.title)}</h1>
-    <div class="info-line"><strong>時間</strong><span>${esc(activity.date || "")} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
+    <div class="info-line"><strong>時間</strong><span>${esc(activityDateText(activity))} ${esc(activity.activityTime || activity.plannedTime || activity.time || "")}</span></div>
     <div class="info-line"><strong>地點</strong><span>${esc(activity.location || "")}</span></div>
     ${attachmentHtml(activity.attachments || [])}
   `;
@@ -138,6 +138,11 @@ function parseLocalTime(value){
 function attachmentHtml(files){
   if(!files.length) return "";
   return `<h3>活動附件</h3>${files.map(f => `<p>📎 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name || f.url)}</a></p>`).join("")}`;
+}
+
+function activityDateText(a){
+  const start=String(a?.date||"");
+  return a?.dateMode==="multi"&&a?.endDate?`${start}～${a.endDate}`:start;
 }
 
 function esc(str){
