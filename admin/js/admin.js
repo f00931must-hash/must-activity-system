@@ -1598,6 +1598,26 @@ async function copyPreviousCertificationRoster(){
   renderCertificationRoster(target);
   await writeAudit("複製名單","認證時數",target,`從 ${source} 複製，共 ${certificationRosterData[target].length} 人`);
 }
+async function deleteCertificationTerm(){
+  const term=val("certificationTerm").trim();
+  if(!term||term==="__new__"){alert("請先選擇要刪除的既有學期。");return;}
+  const rows=Array.isArray(certificationRosterData[term])?certificationRosterData[term]:[];
+  if(!Object.prototype.hasOwnProperty.call(certificationRosterData,term)){
+    alert("這個學期沒有認證名單資料。");return;
+  }
+  const ok=confirm(`確定刪除「${term}」的認證學生名單嗎？\n\n目前共有 ${rows.length} 位學生。\n此操作只刪除認證名單，不會刪除活動、報名、回饋或原始活動資料。`);
+  if(!ok)return;
+  delete certificationRosterData[term];
+  await setDoc(doc(db,"settings","certificationRoster"),{terms:certificationRosterData,updatedAt:serverTimestamp()},{merge:true});
+  if(val("certificationQueryTerm")===term)setVal("certificationQueryTerm","");
+  setVal("certificationTerm","");
+  setVal("certificationNewTerm","");
+  latestCertificationRows=[];
+  syncCertificationTermControls();
+  $("certificationRosterList").innerHTML='<div class="empty">請選擇學期。</div>';
+  $("certificationQueryResult").innerHTML='<div class="empty">請先選擇類別與學期。</div>';
+  await writeAudit("刪除學期","認證時數",term,`刪除認證名單，共 ${rows.length} 人；未刪除任何活動或報名資料`);
+}
 function isExcluded(term,category,person,activityId){
   const key=rosterKey(person);
   return certificationExclusions.some(x=>x.term===term&&x.category===category&&x.personKey===key&&x.activityId===activityId);
@@ -2030,6 +2050,7 @@ bindClick("runCertificationQueryBtn", async e=>{e.preventDefault(); await runCer
 bindClick("saveCertificationRosterBtn", async e=>{e.preventDefault(); await saveCertificationRoster();});
 bindClick("loadCertificationRosterBtn", e=>{e.preventDefault(); loadCertificationRoster();});
 bindClick("copyPreviousCertificationRosterBtn", async e=>{e.preventDefault(); await copyPreviousCertificationRoster();});
+bindClick("deleteCertificationTermBtn", async e=>{e.preventDefault(); await deleteCertificationTerm();});
 bindClick("downloadCertificationExcelBtn", e=>{e.preventDefault(); downloadCertificationExcel();});
 $("certificationTerm")?.addEventListener("change",()=>{
   const value=val("certificationTerm");
