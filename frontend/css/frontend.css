@@ -51,3 +51,33 @@
 @media(max-width:900px){.toolbar{grid-template-columns:1fr}}
 
 .multi-session-time-hint{margin:2px 0 12px;padding-left:0;color:#075985;font-weight:800;line-height:1.5}
+
+/* v4.6.1 student homepage */
+.student-lookup-panel{margin:0 0 14px;padding:16px 18px;border:1px solid #bae6fd;border-radius:20px;background:#f0f9ff;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+.student-lookup-copy{display:flex;flex-direction:column;gap:4px}.student-lookup-copy strong{font-size:17px;color:#075985}.student-lookup-copy span{font-size:14px;color:#64748b}
+.student-lookup-controls{display:flex;gap:8px;align-items:center}.student-lookup-controls .field{min-width:220px}.student-lookup-controls .primary-btn{white-space:nowrap}
+.registration-lookup-result{grid-column:1/-1;border-top:1px solid #bae6fd;padding-top:14px}.lookup-result-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.lookup-close{border:0;background:transparent;font-size:26px;cursor:pointer;color:#64748b}
+.lookup-activity-list{display:grid;gap:8px}.lookup-activity-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid #dbeafe;text-decoration:none;color:inherit}
+.lookup-activity-item>div{display:flex;flex-direction:column;gap:3px}.lookup-activity-item span,.lookup-activity-item small{font-size:13px;color:#64748b}.lookup-arrow{font-size:26px!important;color:#0284c7!important}.lookup-message{padding:8px 2px;color:#475569}
+.activity-filters{grid-template-columns:180px 180px;justify-content:end;margin-bottom:14px}
+.mobile-dashboard-head{display:none}
+
+@media(max-width:640px){
+  body{background:#f5f8fb}
+  .hero{margin:0;padding:22px 18px;border-radius:0 0 26px 26px;box-shadow:none}
+  .hero h1{font-size:25px;margin:5px 0}.hero p{font-size:14px;margin:4px 0}.admin-link{display:none}
+  .wrap{padding:0 12px;margin-bottom:30px}
+  .student-lookup-panel{margin-top:14px;padding:14px;grid-template-columns:1fr;gap:10px;border-radius:18px;background:#fff}
+  .student-lookup-copy span{font-size:13px}.student-lookup-controls{display:grid;grid-template-columns:1fr auto}.student-lookup-controls .field{min-width:0}.student-lookup-controls .primary-btn{padding-left:14px;padding-right:14px}
+  .registration-lookup-result{grid-column:auto}
+  .activity-filters{grid-template-columns:1fr 1fr;margin-bottom:10px}
+  .mobile-dashboard-head{display:flex;justify-content:space-between;align-items:flex-end;padding:10px 2px 8px}.mobile-dashboard-head strong{font-size:19px}.mobile-dashboard-head span{font-size:12px;color:#64748b}
+  .activity-grid{display:flex;flex-direction:column;gap:10px}
+  .activity-card{padding:14px 15px;border-radius:17px;box-shadow:0 3px 12px rgba(15,23,42,.06)}
+  .activity-head{gap:6px}.activity-head h2{font-size:18px;margin:2px 0 4px;line-height:1.4}
+  .status-tags .tag-row{display:none}.tag{font-size:11px}.term-badge{font-size:12px;padding:3px 8px}
+  .activity-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px}.activity-meta div{display:flex;flex-direction:column;gap:1px}.activity-meta strong{font-size:11px;color:#64748b}
+  .activity-desc,.session-summary,.compact-attachments{display:none}
+  .activity-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.activity-actions a{text-align:center;padding:10px 8px}
+  .lookup-activity-item{padding:10px 12px}.lookup-activity-item strong{font-size:14px}
+}
