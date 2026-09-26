@@ -138,20 +138,6 @@ function teacherNameMap(){
   });
   return map;
 }
-function buildOwnerTeacherSelect(selectedEmail){
-  const el=$("ownerTeacherSelect");if(!el)return;
-  const selected=String(selectedEmail!==undefined?selectedEmail:el.value||"").trim().toLowerCase();
-  const rows=[...teacherNameMap().entries()].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant"));
-  el.innerHTML='<option value="">未標記</option>'+rows.map(([email,name])=>`<option value="${esc(email)}">${esc(name)}</option>`).join("");
-  if(rows.some(([email])=>email===selected))el.value=selected;
-  else el.value="";
-}
-function selectedOwnerTeacher(){
-  const email=String($("ownerTeacherSelect")?.value||"").trim().toLowerCase();
-  if(!email)return {email:"",name:""};
-  const name=teacherNameMap().get(email)||email.split("@")[0];
-  return {email,name};
-}
 
 function buildDashboardFilters(){
   const termEl=$("dashboardTermFilter"),teacherEl=$("dashboardTeacherFilter");
@@ -201,7 +187,6 @@ function renderDashboardList(){
 }
 
 function renderLists(){
-  buildOwnerTeacherSelect();
   renderDashboardList();
 }
 
@@ -273,7 +258,6 @@ function card(a){
 function resetForm(){
   setVal("editId", "");
   setText("formTitle", "新增活動");
-  buildOwnerTeacherSelect(String(currentUser?.email||"").trim().toLowerCase());
   setVal("academicYear", "");
   setVal("semester", "");
   setVal("title", "");
@@ -331,7 +315,6 @@ function editActivity(id){
   showView("activities");
   setVal("editId", id);
   setText("formTitle", "修改活動");
-  buildOwnerTeacherSelect(ownerEmailOf(a));
   setVal("academicYear", a.academicYear || "");
   setVal("semester", a.semester || "");
   setVal("title", a.title || "");
@@ -818,10 +801,7 @@ async function saveActivity(event){
       if(saveBtn) saveBtn.textContent = "儲存中…";
     }
 
-  const selectedOwner=selectedOwnerTeacher();
   const data = cleanUndefined({
-    ownerTeacherEmail:selectedOwner.email,
-    ownerTeacherName:selectedOwner.name,
     academicYear: val("academicYear").trim(),
     semester: val("semester"),
     title: val("title").trim(),
@@ -896,8 +876,10 @@ async function saveActivity(event){
       data.registeredCount = 0;
       data.feedbackCount = 0;
       data.createdAt = serverTimestamp();
-      data.createdByEmail = String(currentUser?.email||"").trim().toLowerCase();
-      data.createdByName = String(currentUser?.displayName||"").trim() || String(currentUser?.email||"").split("@")[0];
+      data.ownerTeacherEmail = String(currentUser?.email||"").trim().toLowerCase();
+      data.ownerTeacherName = syncedTeacherName(data.ownerTeacherEmail) || String(currentUser?.displayName||"").trim() || data.ownerTeacherEmail.split("@")[0];
+      data.createdByEmail = data.ownerTeacherEmail;
+      data.createdByName = data.ownerTeacherName;
       const created = await addDoc(collection(db, "activities"), data);
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
     }
