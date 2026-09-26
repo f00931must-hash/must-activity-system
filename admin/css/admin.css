@@ -234,3 +234,9 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
   .dashboard-activity-meta{grid-template-columns:1fr 1fr}
   .dashboard-overview-title{align-items:flex-start}
 }
+
+.link-tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.link-tool-card{border:1px solid #dbeafe;border-radius:16px;padding:16px;background:#f8fbff}
+.link-tool-card h3{margin:0 0 6px}
+.registration-download-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:700px){.link-tool-grid{grid-template-columns:1fr}}
