@@ -22,6 +22,7 @@ let attachments = [];
 let mealOptions = ["葷","素","不用餐"];
 let sessions = [];
 let adminSearchText = "";
+let dashboardMineOnly = false;
 let latestStatsRows = [];
 let latestFileRows = [];
 let unsubscribe = null;
@@ -88,6 +89,7 @@ function listenActivities(){
   unsubscribe = onSnapshot(query(collection(db, "activities"), orderBy("date", "desc")), snap => {
     activities = snap.docs.map(d => ({id:d.id, ...d.data()}));
     updateStats();
+    buildDashboardFilters();
     renderLists();
   }, err => console.error(err));
 }
@@ -99,10 +101,85 @@ function updateStats(){
   setText("statOpenActivities", activities.filter(a=>a.status==="open").length);
 }
 
+function ownerEmailOf(a){ return String(a.ownerTeacherEmail||a.createdByEmail||"").trim().toLowerCase(); }
+function ownerNameOf(a){ return String(a.ownerTeacherName||a.createdByName||"").trim() || (ownerEmailOf(a)?ownerEmailOf(a).split("@")[0]:"未標記"); }
+
+function buildDashboardFilters(){
+  const termEl=$("dashboardTermFilter"),teacherEl=$("dashboardTeacherFilter");
+  if(termEl){
+    const selected=termEl.value;
+    const terms=[...new Set(activities.map(a=>a.academicYear&&a.semester?`${a.academicYear}-${a.semester}`:"").filter(Boolean))].sort().reverse();
+    termEl.innerHTML='<option value="">全部學期</option>'+terms.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+    if(terms.includes(selected))termEl.value=selected;
+  }
+  if(teacherEl){
+    const selected=teacherEl.value;
+    const map=new Map();
+    activities.forEach(a=>{
+      const email=ownerEmailOf(a);
+      if(email)map.set(email,ownerNameOf(a));
+    });
+    const rows=[...map.entries()].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant"));
+    teacherEl.innerHTML='<option value="">全部老師</option>'+rows.map(([email,name])=>`<option value="${esc(email)}">${esc(name)}</option>`).join("")+
+      (activities.some(a=>!ownerEmailOf(a))?'<option value="__unassigned__">未標記老師</option>':'');
+    if([...map.keys(),"__unassigned__"].includes(selected))teacherEl.value=selected;
+  }
+}
+
+function dashboardFilteredActivities(){
+  const keyword=String($("dashboardSearch")?.value||"").trim().toLowerCase();
+  const term=$("dashboardTermFilter")?.value||"";
+  const teacher=$("dashboardTeacherFilter")?.value||"";
+  const status=$("dashboardStatusFilter")?.value||"";
+  const myEmail=String(currentUser?.email||"").toLowerCase();
+  return activities.filter(a=>{
+    const email=ownerEmailOf(a);
+    if(dashboardMineOnly&&email!==myEmail)return false;
+    if(keyword&&!String(a.title||"").toLowerCase().includes(keyword))return false;
+    if(term&&`${a.academicYear||""}-${a.semester||""}`!==term)return false;
+    if(teacher==="__unassigned__"&&email)return false;
+    if(teacher&&teacher!=="__unassigned__"&&email!==teacher)return false;
+    if(status&&a.status!==status)return false;
+    return true;
+  });
+}
+
+function renderDashboardList(){
+  const data=dashboardFilteredActivities();
+  setText("dashboardVisibleCount",data.length);
+  const host=$("activityList");
+  if(host)host.innerHTML=data.length?data.map(dashboardCard).join(""):'<div class="empty">目前沒有符合條件的活動。</div>';
+}
+
 function renderLists(){
+  renderDashboardList();
   const data=activities.filter(a=>!adminSearchText || (a.title||"").includes(adminSearchText) || (a.tags||[]).join(",").includes(adminSearchText));
   const html=data.length ? data.map(card).join("") : '<div class="empty">目前沒有活動</div>';
-  setHtml("activityList", html); setHtml("activityList2", html);
+  setHtml("activityList2", html);
+}
+
+function dashboardCard(a){
+  const cap=Number(a.capacity||0);
+  const reg=Number(a.registeredCount||0);
+  const capText=cap>0?`${reg}/${cap}`:`${reg}/不限`;
+  const sem=a.academicYear&&a.semester?`${a.academicYear}-${a.semester}`:"—";
+  return `<article class="dashboard-activity-card">
+    <div class="dashboard-activity-main">
+      <div class="dashboard-activity-title"><h3>${esc(a.title||"未命名活動")}</h3><span class="badge">${esc(statusText(a.status))}</span></div>
+      <div class="dashboard-activity-meta">
+        <span><small>學期</small><strong>${esc(sem)}</strong></span>
+        <span><small>日期</small><strong>${esc(activityDateText(a)||"—")}</strong></span>
+        <span><small>負責老師</small><strong>${esc(ownerNameOf(a))}</strong></span>
+        <span><small>報名</small><strong>${esc(capText)}</strong></span>
+        <span><small>回饋</small><strong>${Number(a.feedbackCount||0)} 份</strong></span>
+      </div>
+    </div>
+    <div class="dashboard-activity-actions">
+      <button class="ghost-btn" data-view-regs="${a.id}">報名名單</button>
+      <button class="ghost-btn" data-view-fbs="${a.id}">回饋資料</button>
+      <button class="primary-btn" data-edit="${a.id}">管理</button>
+    </div>
+  </article>`;
 }
 
 function card(a){
@@ -120,6 +197,7 @@ function card(a){
         <div><strong>地點</strong><span>📍 ${esc(a.location||"")}</span></div>
         <div><strong>報名</strong><span>${capText}</span></div>
         <div><strong>回饋</strong><span>${a.feedbackCount||0} 份</span></div>
+        <div><strong>負責老師</strong><span>${esc(ownerNameOf(a))}</span></div>
       </div>
       ${a.description ? `<p class="activity-desc">${esc(a.description)}</p>` : ""}
     </div>
@@ -760,6 +838,10 @@ async function saveActivity(event){
       data.registeredCount = 0;
       data.feedbackCount = 0;
       data.createdAt = serverTimestamp();
+      data.ownerTeacherEmail = String(currentUser?.email||"").trim().toLowerCase();
+      data.ownerTeacherName = String(currentUser?.displayName||"").trim() || String(currentUser?.email||"").split("@")[0];
+      data.createdByEmail = data.ownerTeacherEmail;
+      data.createdByName = data.ownerTeacherName;
       const created = await addDoc(collection(db, "activities"), data);
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
     }
@@ -1929,6 +2011,19 @@ onAuthStateChanged(auth, async user => {
   setText("userInfo", user.email);
   resetForm();
   listenActivities();
+});
+
+["dashboardSearch"].forEach(id=>$(id)?.addEventListener("input",renderDashboardList));
+["dashboardTermFilter","dashboardTeacherFilter","dashboardStatusFilter"].forEach(id=>$(id)?.addEventListener("change",()=>{
+  dashboardMineOnly=false;
+  $("dashboardMineBtn")?.classList.remove("active-filter");
+  renderDashboardList();
+}));
+$("dashboardMineBtn")?.addEventListener("click",()=>{
+  dashboardMineOnly=!dashboardMineOnly;
+  $("dashboardMineBtn")?.classList.toggle("active-filter",dashboardMineOnly);
+  if(dashboardMineOnly&&$("dashboardTeacherFilter"))$("dashboardTeacherFilter").value="";
+  renderDashboardList();
 });
 
 const studentLookupInputEl=$("studentLookupInput");
