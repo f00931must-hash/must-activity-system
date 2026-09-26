@@ -177,12 +177,8 @@ function dashboardCard(a){
       </div>
     </div>
     <div class="dashboard-activity-actions">
-      <button class="ghost-btn" data-copy="${regUrl}">複製報名連結</button>
-      <button class="ghost-btn" data-qrprint="${regUrl}" data-title="${esc(a.title)} 報名 QR">下載報名QR A4</button>
-      <button class="ghost-btn" data-copy="${fbUrl}">複製回饋連結</button>
-      <button class="ghost-btn" data-qrprint="${fbUrl}" data-title="${esc(a.title)} 回饋 QR">下載回饋QR A4</button>
+      <button class="ghost-btn" data-open-links="${a.id}">報名與回饋連結</button>
       <button class="ghost-btn" data-view-regs="${a.id}">查看報名名單</button>
-      ${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${a.id}">保險名單</button>` : ""}
       <button class="ghost-btn" data-view-fbs="${a.id}">查看回饋資料</button>
       <button class="ghost-btn" data-export-word="${a.id}">下載成果Word</button>
       <button class="ghost-btn" data-copy-activity="${a.id}">複製活動</button>
@@ -869,6 +865,36 @@ async function saveActivity(event){
   }
 }
 
+function openActivityLinks(id){
+  const a=activities.find(x=>x.id===id);
+  if(!a)return;
+  const regUrl=siteConfig.baseUrl+"frontend/activity.html?id="+a.id;
+  const fbUrl=siteConfig.baseUrl+"frontend/feedback.html?id="+a.id;
+  setHtml("modalContent", `
+    <button class="modal-close" data-modal-close type="button">×</button>
+    <h2>${esc(a.title)}｜報名與回饋連結</h2>
+    <div class="link-tool-grid">
+      <section class="link-tool-card">
+        <h3>報名</h3>
+        <p class="hint">提供給學生填寫活動報名。</p>
+        <div class="modal-actions">
+          <button class="ghost-btn" data-copy="${esc(regUrl)}">複製報名連結</button>
+          <button class="primary-btn" data-qrprint="${esc(regUrl)}" data-title="${esc(a.title)} 報名 QR">下載報名 QR A4</button>
+        </div>
+      </section>
+      <section class="link-tool-card">
+        <h3>回饋</h3>
+        <p class="hint">活動結束後提供學生填寫回饋。</p>
+        <div class="modal-actions">
+          <button class="ghost-btn" data-copy="${esc(fbUrl)}">複製回饋連結</button>
+          <button class="primary-btn" data-qrprint="${esc(fbUrl)}" data-title="${esc(a.title)} 回饋 QR">下載回饋 QR A4</button>
+        </div>
+      </section>
+    </div>
+  `);
+  $("modal")?.classList.remove("hidden");
+}
+
 async function deleteActivity(id){
   if(!confirm("確定刪除此活動？")) return;
   const a = activities.find(x=>x.id===id);
@@ -911,7 +937,7 @@ async function viewRegistrations(id){
     <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th>${a.fixedFields?.birthDate?"<th>出生年月日</th>":""}${a.fixedFields?.nationalId?"<th>身分證字號</th>":""}<th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td>${a.fixedFields?.birthDate?`<td>${esc(r.birthDate||"")}</td>`:""}${a.fixedFields?.nationalId?`<td>${esc(maskNationalId(r.nationalId||""))}</td>`:""}<td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
-  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<p><button class="primary-btn" data-export-regs="${id}">下載簽到表</button></p>`);
+  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<div class="registration-download-actions"><button class="primary-btn" data-export-regs="${id}">下載簽到表</button>${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${id}">下載保險名單</button>` : ""}</div>`);
   $("modal")?.classList.remove("hidden");
   document.querySelectorAll(".assigned-session-select").forEach(el=>el.onchange=async()=>{await updateDoc(doc(db,"activities",el.dataset.activity,"registrations",el.dataset.reg),{assignedSession:el.value,updatedAt:serverTimestamp()});});
 }
@@ -1948,6 +1974,9 @@ document.addEventListener("click", async (e) => {
 
   const qr = e.target.closest("[data-qr]");
   if(qr) return downloadQr(qr.dataset.qr, qr.dataset.name || "qr");
+
+  const openLinks = e.target.closest("[data-open-links]");
+  if(openLinks) return openActivityLinks(openLinks.dataset.openLinks);
 
   const viewRegs = e.target.closest("[data-view-regs]");
   if(viewRegs) return viewRegistrations(viewRegs.dataset.viewRegs);
