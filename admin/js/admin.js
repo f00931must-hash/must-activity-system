@@ -104,6 +104,38 @@ function updateStats(){
 function ownerEmailOf(a){ return String(a.ownerTeacherEmail||a.createdByEmail||"").trim().toLowerCase(); }
 function ownerNameOf(a){ return String(a.ownerTeacherName||a.createdByName||"").trim() || (ownerEmailOf(a)?ownerEmailOf(a).split("@")[0]:"未標記"); }
 
+function teacherNameMap(){
+  const map=new Map();
+  activities.forEach(a=>{
+    const email=ownerEmailOf(a);
+    if(email)map.set(email,ownerNameOf(a));
+  });
+  if(currentUser?.email){
+    const email=String(currentUser.email).trim().toLowerCase();
+    const name=String(currentUser.displayName||"").trim() || email.split("@")[0];
+    map.set(email,name);
+  }
+  adminEmails.forEach(raw=>{
+    const email=String(raw||"").trim().toLowerCase();
+    if(email&&!map.has(email))map.set(email,email.split("@")[0]);
+  });
+  return map;
+}
+function buildOwnerTeacherSelect(selectedEmail){
+  const el=$("ownerTeacherSelect");if(!el)return;
+  const selected=String(selectedEmail!==undefined?selectedEmail:el.value||"").trim().toLowerCase();
+  const rows=[...teacherNameMap().entries()].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant"));
+  el.innerHTML='<option value="">未標記</option>'+rows.map(([email,name])=>`<option value="${esc(email)}">${esc(name)}（${esc(email)}）</option>`).join("");
+  if(rows.some(([email])=>email===selected))el.value=selected;
+  else el.value="";
+}
+function selectedOwnerTeacher(){
+  const email=String($("ownerTeacherSelect")?.value||"").trim().toLowerCase();
+  if(!email)return {email:"",name:""};
+  const name=teacherNameMap().get(email)||email.split("@")[0];
+  return {email,name};
+}
+
 function buildDashboardFilters(){
   const termEl=$("dashboardTermFilter"),teacherEl=$("dashboardTeacherFilter");
   if(termEl){
@@ -152,10 +184,8 @@ function renderDashboardList(){
 }
 
 function renderLists(){
+  buildOwnerTeacherSelect();
   renderDashboardList();
-  const data=activities.filter(a=>!adminSearchText || (a.title||"").includes(adminSearchText) || (a.tags||[]).join(",").includes(adminSearchText));
-  const html=data.length ? data.map(card).join("") : '<div class="empty">目前沒有活動</div>';
-  setHtml("activityList2", html);
 }
 
 function dashboardCard(a){
@@ -226,6 +256,7 @@ function card(a){
 function resetForm(){
   setVal("editId", "");
   setText("formTitle", "新增活動");
+  buildOwnerTeacherSelect(String(currentUser?.email||"").trim().toLowerCase());
   setVal("academicYear", "");
   setVal("semester", "");
   setVal("title", "");
@@ -283,6 +314,7 @@ function editActivity(id){
   showView("activities");
   setVal("editId", id);
   setText("formTitle", "修改活動");
+  buildOwnerTeacherSelect(ownerEmailOf(a));
   setVal("academicYear", a.academicYear || "");
   setVal("semester", a.semester || "");
   setVal("title", a.title || "");
@@ -769,7 +801,10 @@ async function saveActivity(event){
       if(saveBtn) saveBtn.textContent = "儲存中…";
     }
 
+  const selectedOwner=selectedOwnerTeacher();
   const data = cleanUndefined({
+    ownerTeacherEmail:selectedOwner.email,
+    ownerTeacherName:selectedOwner.name,
     academicYear: val("academicYear").trim(),
     semester: val("semester"),
     title: val("title").trim(),
@@ -844,10 +879,8 @@ async function saveActivity(event){
       data.registeredCount = 0;
       data.feedbackCount = 0;
       data.createdAt = serverTimestamp();
-      data.ownerTeacherEmail = String(currentUser?.email||"").trim().toLowerCase();
-      data.ownerTeacherName = String(currentUser?.displayName||"").trim() || String(currentUser?.email||"").split("@")[0];
-      data.createdByEmail = data.ownerTeacherEmail;
-      data.createdByName = data.ownerTeacherName;
+      data.createdByEmail = String(currentUser?.email||"").trim().toLowerCase();
+      data.createdByName = String(currentUser?.displayName||"").trim() || String(currentUser?.email||"").split("@")[0];
       const created = await addDoc(collection(db, "activities"), data);
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
     }
@@ -1946,10 +1979,6 @@ bindClick("addAttachmentBtn", (e) => { e.preventDefault(); attachments.push({nam
 
 const activityForm = $("activityForm");
 if(activityForm) activityForm.addEventListener("submit", saveActivity);
-
-const adminSearch = $("adminSearch");
-if(adminSearch) adminSearch.addEventListener("input", e => { adminSearchText = e.target.value.trim(); renderLists(); });
-
 
 document.addEventListener("click", async (e) => {
   if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
