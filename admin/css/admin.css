@@ -270,3 +270,9 @@ h3 small{font-size:13px;color:var(--muted);font-weight:400}
   .activity-title-field{grid-column:auto}
   #view-activities .editor-panel{padding:18px}
 }
+
+/* v4.5.5 certification term selector */
+.certification-new-term{margin-top:10px}
+.certification-roster-actions{display:flex;gap:8px;flex-wrap:wrap}
+#view-certification .certification-grid{align-items:start}
+#view-certification select.field{width:100%}
