@@ -9,6 +9,7 @@ const provider = new GoogleAuthProvider();
 
 let activities = [];
 let adminEmails = [];
+let adminUsers = [];
 let systemTags = [];
 let certificationTags = [];
 let certificationRosterData = {};
@@ -57,7 +58,9 @@ function isAdmin(email){ return adminEmails.includes(email); }
 async function loadAdmins(){
   const ref = doc(db, "settings", "admins");
   const snap = await getDoc(ref);
-  adminEmails = snap.exists() ? (snap.data().emails || []) : [];
+  const data = snap.exists() ? snap.data() : {};
+  adminEmails = data.emails || [];
+  adminUsers = Array.isArray(data.users) ? data.users : [];
   for(const email of builtInAdmins){
     if(!adminEmails.includes(email)) adminEmails.push(email);
   }
@@ -102,17 +105,30 @@ function updateStats(){
 }
 
 function ownerEmailOf(a){ return String(a.ownerTeacherEmail||a.createdByEmail||"").trim().toLowerCase(); }
-function ownerNameOf(a){ return String(a.ownerTeacherName||a.createdByName||"").trim() || (ownerEmailOf(a)?ownerEmailOf(a).split("@")[0]:"未標記"); }
+function syncedTeacherName(email){
+  const key=String(email||"").trim().toLowerCase();
+  const row=adminUsers.find(u=>String(u?.email||"").trim().toLowerCase()===key);
+  return String(row?.name||row?.displayName||"").trim();
+}
+function ownerNameOf(a){
+  const email=ownerEmailOf(a);
+  return syncedTeacherName(email) || String(a.ownerTeacherName||a.createdByName||"").trim() || (email?email.split("@")[0]:"未標記");
+}
 
 function teacherNameMap(){
   const map=new Map();
+  adminUsers.forEach(u=>{
+    const email=String(u?.email||"").trim().toLowerCase();
+    const name=String(u?.name||u?.displayName||"").trim();
+    if(email&&name)map.set(email,name);
+  });
   activities.forEach(a=>{
     const email=ownerEmailOf(a);
-    if(email)map.set(email,ownerNameOf(a));
+    if(email&&!map.has(email))map.set(email,String(a.ownerTeacherName||a.createdByName||"").trim()||email.split("@")[0]);
   });
   if(currentUser?.email){
     const email=String(currentUser.email).trim().toLowerCase();
-    const name=String(currentUser.displayName||"").trim() || email.split("@")[0];
+    const name=syncedTeacherName(email)||String(currentUser.displayName||"").trim()||email.split("@")[0];
     map.set(email,name);
   }
   adminEmails.forEach(raw=>{
