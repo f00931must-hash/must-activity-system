@@ -163,6 +163,8 @@ function dashboardCard(a){
   const reg=Number(a.registeredCount||0);
   const capText=cap>0?`${reg}/${cap}`:`${reg}/不限`;
   const sem=a.academicYear&&a.semester?`${a.academicYear}-${a.semester}`:"—";
+  const regUrl = siteConfig.baseUrl + "frontend/activity.html?id=" + a.id;
+  const fbUrl = siteConfig.baseUrl + "frontend/feedback.html?id=" + a.id;
   return `<article class="dashboard-activity-card">
     <div class="dashboard-activity-main">
       <div class="dashboard-activity-title"><h3>${esc(a.title||"未命名活動")}</h3><span class="badge">${esc(statusText(a.status))}</span></div>
@@ -175,9 +177,17 @@ function dashboardCard(a){
       </div>
     </div>
     <div class="dashboard-activity-actions">
-      <button class="ghost-btn" data-view-regs="${a.id}">報名名單</button>
-      <button class="ghost-btn" data-view-fbs="${a.id}">回饋資料</button>
-      <button class="primary-btn" data-edit="${a.id}">管理</button>
+      <button class="ghost-btn" data-copy="${regUrl}">複製報名連結</button>
+      <button class="ghost-btn" data-qrprint="${regUrl}" data-title="${esc(a.title)} 報名 QR">下載報名QR A4</button>
+      <button class="ghost-btn" data-copy="${fbUrl}">複製回饋連結</button>
+      <button class="ghost-btn" data-qrprint="${fbUrl}" data-title="${esc(a.title)} 回饋 QR">下載回饋QR A4</button>
+      <button class="ghost-btn" data-view-regs="${a.id}">查看報名名單</button>
+      ${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${a.id}">保險名單</button>` : ""}
+      <button class="ghost-btn" data-view-fbs="${a.id}">查看回饋資料</button>
+      <button class="ghost-btn" data-export-word="${a.id}">下載成果Word</button>
+      <button class="ghost-btn" data-copy-activity="${a.id}">複製活動</button>
+      <button class="primary-btn" data-edit="${a.id}">修改</button>
+      <button class="ghost-btn danger-btn" data-delete="${a.id}">刪除</button>
     </div>
   </article>`;
 }
