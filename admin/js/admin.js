@@ -125,7 +125,7 @@ function buildOwnerTeacherSelect(selectedEmail){
   const el=$("ownerTeacherSelect");if(!el)return;
   const selected=String(selectedEmail!==undefined?selectedEmail:el.value||"").trim().toLowerCase();
   const rows=[...teacherNameMap().entries()].sort((a,b)=>a[1].localeCompare(b[1],"zh-Hant"));
-  el.innerHTML='<option value="">未標記</option>'+rows.map(([email,name])=>`<option value="${esc(email)}">${esc(name)}（${esc(email)}）</option>`).join("");
+  el.innerHTML='<option value="">未標記</option>'+rows.map(([email,name])=>`<option value="${esc(email)}">${esc(name)}</option>`).join("");
   if(rows.some(([email])=>email===selected))el.value=selected;
   else el.value="";
 }
