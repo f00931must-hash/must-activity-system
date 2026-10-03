@@ -227,7 +227,7 @@ function card(a){
   const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "—";
   return `<article class="activity-admin-card">
     <div class="activity-card-main">
-      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([a.certificationTag, ...(a.tags || [])].filter(Boolean))}</div></div>
+      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([...activityCertificationTags(a), ...(a.tags || [])].filter(Boolean))}</div></div>
       <div class="activity-info-grid">
         <div><strong>學期</strong><span>${esc(sem)}</span></div>
         <div><strong>日期</strong><span>📅 ${esc(activityDateText(a))}</span></div>
@@ -361,7 +361,7 @@ function editActivity(id){
   feedbackTextQuestions = a.feedbackTextQuestions || [];
   attachments = a.attachments || [];
   renderAttachments();
-  renderTagSelect(a.tags || [], a.certificationTag || "");
+  renderTagSelect(a.tags || [], activityCertificationTags(a));
   renderRegFields();
   renderFbQuestions();
   renderFeedbackTextQuestions();
@@ -418,7 +418,7 @@ function copyActivity(id){
   fbQuestions = [...(a.feedbackQuestions || [])];
   feedbackTextQuestions = [...(a.feedbackTextQuestions || [])];
   attachments = JSON.parse(JSON.stringify(a.attachments || []));
-  renderAttachments(); renderTagSelect(a.tags || [], a.certificationTag || ""); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
+  renderAttachments(); renderTagSelect(a.tags || [], activityCertificationTags(a)); renderRegFields(); renderFbQuestions(); renderFeedbackTextQuestions();
 }
 
 
@@ -815,7 +815,8 @@ async function saveActivity(event){
     location: checked("multiSessionEnabled") ? MULTI_SESSION_LOCATION_TEXT : val("location").trim(),
     multiSessionEnabled: checked("multiSessionEnabled"),
     sessions: checked("multiSessionEnabled") ? sessions.filter(x=>x.date).map((x,i)=>({...x,location:String(x.location||"").trim(),id:x.id||`session_${Date.now()}_${i}`})) : [],
-    certificationTag: getSelectedCertificationTag(),
+    certificationTag: getSelectedCertificationTags()[0] || "",
+    certificationTags: getSelectedCertificationTags(),
     tags: [...new Set(getSelectedTags())],
     description: val("description").trim(),
     capacity: Number(val("capacity") || 0),
@@ -1432,13 +1433,25 @@ function toggleActivityTimeSame(){
   ["activityStartTime","activityEndTime"].forEach(id=>{const el=$(id); if(el){el.disabled=same; if(same) el.value=id.includes("Start")?val("plannedStartTime"):val("plannedEndTime");}});
 }
 function getSelectedTags(){ return Array.from(document.querySelectorAll("#tagSelectBox .tag-check:checked")).map(el=>el.value); }
-function getSelectedCertificationTag(){ return document.querySelector('#certificationTagSelectBox input[name="certificationTag"]:checked')?.value || ""; }
+function activityCertificationTags(a){
+  return [...new Set((Array.isArray(a.certificationTags)?a.certificationTags:[a.certificationTag]).filter(t=>typeof t==="string"&&t))];
+}
+function getSelectedCertificationTags(){return [...document.querySelectorAll('#certificationTagSelectBox input[name="certificationTag"]:checked')].map(x=>x.value).filter(Boolean);}
 function renderTagSelect(selected=[], selectedCertification=""){
   const selectedTags=Array.isArray(selected)?selected:[];
   const box=$("tagSelectBox");
   if(box) box.innerHTML=systemTags.length?systemTags.map(t=>`<label class="tag-check-label"><input type="checkbox" class="tag-check" value="${esc(t)}" ${selectedTags.includes(t)?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join(""):'<div class="empty">尚未建立一般標籤。</div>';
   const certBox=$("certificationTagSelectBox");
-  if(certBox) certBox.innerHTML=certificationTags.length?`<label class="tag-check-label"><input type="radio" name="certificationTag" value="" ${!selectedCertification?"checked":""}><span class="tag">不設定</span></label>`+certificationTags.map(t=>`<label class="tag-check-label"><input type="radio" name="certificationTag" value="${esc(t)}" ${selectedCertification===t?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join(""):'<div class="empty">尚未建立可認證類別。</div>';
+  const selectedCerts=Array.isArray(selectedCertification)?selectedCertification:(selectedCertification?[selectedCertification]:[]);
+  if(certBox){
+    const available=[...new Set([...certificationTags,...selectedCerts])];
+    certBox.innerHTML=available.length?`<label class="tag-check-label"><input type="checkbox" data-certification-none ${!selectedCerts.length?"checked":""}><span class="tag">不設定</span></label>`+available.map(t=>`<label class="tag-check-label"><input type="checkbox" name="certificationTag" value="${esc(t)}" ${selectedCerts.includes(t)?"checked":""}><span class="tag ${tagColorClass(t)}">${esc(t)}</span></label>`).join(""):'<div class="empty">尚未建立可認證類別。</div>';
+    certBox.onchange=e=>{
+      if(e.target.matches("[data-certification-none]")&&e.target.checked)certBox.querySelectorAll('[name="certificationTag"]').forEach(x=>x.checked=false);
+      const none=certBox.querySelector("[data-certification-none]");
+      if(none)none.checked=getSelectedCertificationTags().length===0;
+    };
+  }
 }
 function renderTagManager(){
   const box=$("tagManageBox"); if(box) box.innerHTML=systemTags.length?systemTags.map(t=>`<span class="tag-manage-item"><span class="tag ${tagColorClass(t)}">${esc(t)}</span><button type="button" class="ghost-btn danger-btn" data-remove-tag="${esc(t)}">刪除</button></span>`).join(""):'<div class="empty">目前尚未建立一般標籤。</div>';
@@ -1454,7 +1467,7 @@ async function loadTags(){
 }
 async function saveTags(){
   await setDoc(doc(db,"settings","activityTags"),{tags:systemTags,multiTags:systemTags,singleTags:certificationTags,updatedAt:serverTimestamp()},{merge:true});
-  renderTagManager(); renderTagSelect(getSelectedTags(),getSelectedCertificationTag());
+  renderTagManager(); renderTagSelect(getSelectedTags(),getSelectedCertificationTags());
 }
 function certificationTermSortValue(term){
   const m=String(term||"").trim().match(/^(\d+)\s*[-－]\s*([12])$/);
@@ -1610,7 +1623,7 @@ async function runCertificationQuery(){
   const roster=Array.isArray(certificationRosterData[term])?certificationRosterData[term]:[];
   if(!roster.length){if(out)out.innerHTML='<div class="empty">這個學期尚未建立認證學生名單。</div>';return;}
   if(out)out.innerHTML='<div class="empty">查詢中…</div>';
-  const chosen=activities.filter(a=>a.certificationTag===selected && `${a.academicYear||""}-${a.semester||""}`===term);
+  const chosen=activities.filter(a=>activityCertificationTags(a).includes(selected) && `${a.academicYear||""}-${a.semester||""}`===term);
   const results=[];
   for(const person of roster){
     const attended=[];
