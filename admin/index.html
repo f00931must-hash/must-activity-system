@@ -30,7 +30,7 @@
     <div class="activity-time-block"><div class="time-heading"><label>活動時間</label><label class="check-row compact"><input id="activityTimeSame" type="checkbox" checked> 同計劃時間</label></div><div class="time-range"><input id="activityStartTime" type="time" class="field" step="300"><span>至</span><input id="activityEndTime" type="time" class="field" step="300"></div><p class="hint">學生端與首頁卡片顯示活動時間；簽到表仍使用計劃時間。</p></div>
   </section>
 </div><h3>多場次報名</h3><label class="check-row"><input id="multiSessionEnabled" type="checkbox"> 啟用多場次報名（學生可複選所有能參加的場次）</label><div id="sessionsBox" class="field-list"></div><div class="multi-session-actions"><button type="button" class="ghost-btn" id="addSessionBtn">＋新增場次</button><button type="button" class="ghost-btn danger-btn" id="deleteSessionsBtn">刪除多場次設定</button></div><div class="activity-tags-grid">
-  <section class="editor-subsection"><label>可認證類別（單選）</label><p class="hint">由老師在標籤管理建立；每場活動最多選擇一項。</p><div id="certificationTagSelectBox" class="tag-select-box"></div></section>
+  <section class="editor-subsection"><label>可認證類別（可複選）</label><p class="hint">由老師在標籤管理建立；每場活動可選擇多項。</p><div id="certificationTagSelectBox" class="tag-select-box"></div></section>
   <section class="editor-subsection"><label>其他活動標籤（可複選）</label><p class="hint">一般分類標籤可同時勾選多項。</p><div id="tagSelectBox" class="tag-select-box"></div></section>
 </div>
 
@@ -143,7 +143,7 @@
     <div id="fileList" class="admin-list">尚未載入</div>
   </section>
 </section><section id="view-tags" class="view hidden"><section class="panel"><h2>🏷 標籤管理</h2>
-<h3>可認證類別（活動建立時單選）</h3><p class="hint">例如：可認證助理人員時數、可認證志工時數。每場活動只能選一項。</p><div class="admin-email-row"><input id="certificationTagInput" class="field" placeholder="例如：可認證助理人員時數"><button id="addCertificationTagBtn" type="button" class="primary-btn">新增單選類別</button></div><div id="certificationTagManageBox" class="tag-manage-box"></div>
+<h3>可認證類別（活動建立時可複選）</h3><p class="hint">例如：可認證助理人員時數、可認證志工時數。每場活動可選擇多項。</p><div class="admin-email-row"><input id="certificationTagInput" class="field" placeholder="例如：可認證助理人員時數"><button id="addCertificationTagBtn" type="button" class="primary-btn">新增認證類別</button></div><div id="certificationTagManageBox" class="tag-manage-box"></div>
 <h3>一般標籤（活動建立時可複選）</h3><p class="hint">例如：手作、講座、校外活動。</p><div class="admin-email-row"><input id="tagInput" class="field" placeholder="例如：手作"><button id="addTagBtn" type="button" class="primary-btn">新增一般標籤</button></div><div id="tagManageBox" class="tag-manage-box"></div>
 
 </section></section><section id="view-certification" class="view hidden"><section class="panel"><h2>🧾 認證時數管理</h2><p class="hint">僅統計老師維護名單中的學生。刪除場次只會從認證統計排除，不會刪除原始報名資料。</p><div class="certification-grid">
@@ -184,7 +184,7 @@
   </div>
 </div>
 
-<script type="module" src="./js/admin.js?v=4.6.9"></script>
+<script type="module" src="./js/admin.js?v=4.6.10"></script>
 
 
 </body></html>
