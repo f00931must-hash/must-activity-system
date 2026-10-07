@@ -77,7 +77,14 @@
   .activity-head{gap:6px}.activity-head h2{font-size:18px;margin:2px 0 4px;line-height:1.4}
   .status-tags .tag-row{display:none}.tag{font-size:11px}.term-badge{font-size:12px;padding:3px 8px}
   .activity-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px}.activity-meta div{display:flex;flex-direction:column;gap:1px}.activity-meta strong{font-size:11px;color:#64748b}
-  .activity-desc,.session-summary,.compact-attachments{display:none}
+  .activity-card .activity-desc,.activity-card .session-summary{display:none}
   .activity-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.activity-actions a{text-align:center;padding:10px 8px}
   .lookup-activity-item{padding:10px 12px}.lookup-activity-item strong{font-size:14px}
+}
+
+/* Keep uploaded documents accessible on mobile, including the registration page. */
+.compact-attachments a{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
+@media(max-width:640px){
+  .compact-attachments{display:flex;flex-direction:column;align-items:stretch}
+  .compact-attachments a{display:flex;min-height:44px;align-items:center;box-sizing:border-box;border-radius:12px;padding:10px 12px}
 }
