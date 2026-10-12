@@ -162,7 +162,9 @@ export default {
         return html(`<h1>選取資教日曆</h1>${selected?`<p>目前指定：${esc(selected.name)}</p>`:""}<form method="post" action="/calendar/select"><input type="hidden" name="csrf" value="${esc(s.csrf)}"><select name="calendarId" required>${list.map(c=>`<option value="${esc(c.id)}">${esc(c.summaryOverride||c.summary)}（${esc(c.id)}）</option>`).join("")}</select><button>確認使用這份日曆</button></form><p>只保存同步目標，不會寫入或刪除既有活動。</p>`);
       }
       if(req.method==="POST"&&u.pathname==="/calendar/select"){
-        if(req.headers.get("Origin")!==u.origin)throw Error("請從日曆設定頁操作。");
+        const origin=req.headers.get("Origin");
+        // no-referrer can produce an opaque Origin on this form; the signed session and CSRF token remain mandatory.
+        if(origin&&origin!=="null"&&origin!==u.origin)throw Error("請從日曆設定頁操作。");
         const s=await session(req,env),f=await req.formData();if(f.get("csrf")!==s.csrf)throw Error("設定驗證失敗，請重新讀取。");
         const c=(await calendars(env)).find(c=>c.id===f.get("calendarId"));if(!c)throw Error("此日曆無可編輯權限。");
         await env.CALENDAR_KV.put("calendar:selected",JSON.stringify({id:c.id,name:c.summaryOverride||c.summary,connectedBy:ADMIN,selectedAt:new Date().toISOString()}));
