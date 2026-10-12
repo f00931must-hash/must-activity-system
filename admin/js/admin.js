@@ -95,6 +95,7 @@ function listenActivities(){
     updateStats();
     buildDashboardFilters();
     renderLists();
+    renderCalendarSyncPanel();
   }, err => console.error(err));
 }
 
@@ -870,6 +871,7 @@ async function saveActivity(event){
   }
 
     const id = val("editId");
+    let calendarActivityId=id;
     if(id){
       await updateDoc(doc(db, "activities", id), data);
       await writeAudit("修改", "活動", data.title, "更新活動內容或設定");
@@ -882,9 +884,11 @@ async function saveActivity(event){
       data.createdByEmail = data.ownerTeacherEmail;
       data.createdByName = data.ownerTeacherName;
       const created = await addDoc(collection(db, "activities"), data);
+      calendarActivityId=created.id;
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
     }
-    alert("活動與附件已儲存");
+    const calendarOk=await syncActivityCalendar(calendarActivityId,"sync");
+    alert(calendarOk?"活動與附件已儲存，日曆已同步":"活動與附件已儲存；日曆待同步，可按「重試待同步」。");
     resetForm();
     showView("activities");
   }catch(err){
@@ -932,6 +936,8 @@ async function deleteActivity(id){
   if(!confirm("確定刪除此活動？")) return;
   const a = activities.find(x=>x.id===id);
   await deleteDoc(doc(db, "activities", id));
+  const calendarOk=await syncActivityCalendar(id,"delete");
+  if(!calendarOk)alert("活動已刪除；日曆移除待同步，可按「重試待同步」。");
   await writeAudit("刪除", "活動", a?.title || id, "刪除活動");
 }
 
@@ -2231,3 +2237,27 @@ if(activityTimeSameEl) activityTimeSameEl.addEventListener("change",toggleActivi
 ["plannedStartTime","plannedEndTime"].forEach(id=>$(id)?.addEventListener("input",()=>{if(checked("activityTimeSame")) toggleActivityTimeSame();}));
 const tagInputEl=$("tagInput");
 if(tagInputEl) tagInputEl.addEventListener("keydown", e=>{if(e.key==="Enter"){e.preventDefault(); $("addTagBtn")?.click();}});
+
+const CALENDAR_WORKER="https://must-activity-calendar.f00931-must.workers.dev";
+let calendarSyncBusy=false;
+function calendarQueueKey(){return "must-calendar-pending:"+String(currentUser?.email||"").toLowerCase();}
+function calendarQueue(){try{return JSON.parse(localStorage.getItem(calendarQueueKey())||"{}");}catch{return {};}}
+function saveCalendarQueue(q){try{localStorage.setItem(calendarQueueKey(),JSON.stringify(q));}catch{}}
+async function syncActivityCalendar(id,action){
+  const q=calendarQueue();q[id]={action,at:Date.now()};saveCalendarQueue(q);renderCalendarSyncPanel();
+  try{
+    const token=await auth.currentUser.getIdToken();
+    const res=await fetch(CALENDAR_WORKER+"/api/activity/sync",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({activityId:id,action}),signal:AbortSignal.timeout(15000)});
+    const d=await res.json();if(!res.ok||!d.ok)throw Error(d.error||"日曆同步失敗");
+    const latest=calendarQueue();if(latest[id]?.at===q[id].at){delete latest[id];saveCalendarQueue(latest);}
+    renderCalendarSyncPanel();return true;
+  }catch(err){console.warn("calendar sync pending",id,err.message);const latest=calendarQueue();if(latest[id]?.at===q[id].at){latest[id].error=err.message;saveCalendarQueue(latest);}renderCalendarSyncPanel();return false;}
+}
+function renderCalendarSyncPanel(){
+  const view=document.getElementById("view-activities");if(!view||!currentUser)return;
+  let panel=document.getElementById("calendarSyncPanel");if(!panel){panel=document.createElement("section");panel.id="calendarSyncPanel";panel.className="panel";view.prepend(panel);}
+  const q=calendarQueue(),pending=Object.keys(q);
+  panel.innerHTML='<h3>資教共用日曆</h3><p>活動儲存或刪除後自動同步到「明新資源教室行事曆」。'+(pending.length?'尚有 '+pending.length+' 筆待同步。':'目前沒有待同步項目。')+'</p><div class="button-row"><select id="calendarActivitySelect" class="field"><option value="">選擇既有活動</option>'+activities.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.title)+'｜'+esc(a.date)+'</option>').join("")+'</select><button type="button" class="ghost-btn" id="calendarOneSync">同步這場活動</button><button type="button" class="ghost-btn" id="calendarRetry" '+(!pending.length||calendarSyncBusy?'disabled':'')+'>重試待同步</button></div>'+pending.map(id=>'<p class="hint">'+esc(activities.find(a=>a.id===id)?.title||"已刪除活動")+'：'+esc(q[id].error||"等待同步")+'</p>').join("");
+  document.getElementById("calendarOneSync").onclick=async()=>{const id=document.getElementById("calendarActivitySelect").value;if(!id)return alert("請先選擇活動");if(calendarSyncBusy)return;calendarSyncBusy=true;try{alert(await syncActivityCalendar(id,"sync")?"日曆已同步":"日曆同步失敗，請查看待同步訊息。");}finally{calendarSyncBusy=false;renderCalendarSyncPanel();}};
+  document.getElementById("calendarRetry").onclick=async()=>{if(calendarSyncBusy)return;calendarSyncBusy=true;try{for(const [id,item] of Object.entries(calendarQueue()))await syncActivityCalendar(id,item.action);}finally{calendarSyncBusy=false;renderCalendarSyncPanel();}};
+}
