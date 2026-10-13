@@ -1,4 +1,3 @@
-import { resetCourse, loadCourse, courseData, saveCourse } from "./course-editor.js?v=1.0.0";
 
 import { db, auth } from "../../shared/js/firebase-app.js";
 import { builtInAdmins, siteConfig } from "../../shared/js/firebase-config.js";
@@ -258,7 +257,6 @@ function card(a){
 }
 
 function resetForm(){
-  resetCourse();
   setVal("editId", "");
   setText("formTitle", "新增活動");
   setVal("academicYear", "");
@@ -315,7 +313,6 @@ function resetForm(){
 function editActivity(id){
   const a = activities.find(x => x.id === id);
   if(!a) return;
-  loadCourse(a);
   showView("activities");
   setVal("editId", id);
   setText("formTitle", "修改活動");
@@ -374,7 +371,6 @@ function editActivity(id){
 function copyActivity(id){
   const a = activities.find(x => x.id === id);
   if(!a) return;
-  loadCourse(a);
   showView("activities");
   setVal("editId", "");
   setText("formTitle", "複製活動（請確認日期後儲存）");
@@ -806,9 +802,7 @@ async function saveActivity(event){
       if(saveBtn) saveBtn.textContent = "儲存中…";
     }
 
-  const course=courseData();
   const data = cleanUndefined({
-    ...course,
     academicYear: val("academicYear").trim(),
     semester: val("semester"),
     title: val("title").trim(),
@@ -892,10 +886,6 @@ async function saveActivity(event){
       const created = await addDoc(collection(db, "activities"), data);
       calendarActivityId=created.id;
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
-    }
-    if(course.contentType==="course"){
-      setVal("editId",calendarActivityId);
-      try{await saveCourse(calendarActivityId);}catch(e){alert("課程基本資料已儲存，但考試尚未儲存："+e.message+"。題目保留在畫面，請完成考試服務設定後再儲存。");return;}
     }
     const calendarOk=await syncActivityCalendar(calendarActivityId,"sync");
     alert(calendarOk?"活動與附件已儲存，日曆已同步":"活動與附件已儲存；日曆待同步，可按「重試待同步」。");
