@@ -2255,9 +2255,10 @@ async function syncActivityCalendar(id,action){
 }
 function renderCalendarSyncPanel(){
   const view=document.getElementById("view-activities");if(!view||!currentUser)return;
-  let panel=document.getElementById("calendarSyncPanel");if(!panel){panel=document.createElement("section");panel.id="calendarSyncPanel";panel.className="panel";view.prepend(panel);}
-  const q=calendarQueue(),pending=Object.keys(q);
-  panel.innerHTML='<h3>資教共用日曆</h3><p>活動儲存或刪除後自動同步到「明新資源教室行事曆」。'+(pending.length?'尚有 '+pending.length+' 筆待同步。':'目前沒有待同步項目。')+'</p><div class="button-row"><select id="calendarActivitySelect" class="field"><option value="">選擇既有活動</option>'+activities.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.title)+'｜'+esc(a.date)+'</option>').join("")+'</select><button type="button" class="ghost-btn" id="calendarOneSync">同步這場活動</button><button type="button" class="ghost-btn" id="calendarRetry" '+(!pending.length||calendarSyncBusy?'disabled':'')+'>重試待同步</button></div>'+pending.map(id=>'<p class="hint">'+esc(activities.find(a=>a.id===id)?.title||"已刪除活動")+'：'+esc(q[id].error||"等待同步")+'</p>').join("");
-  document.getElementById("calendarOneSync").onclick=async()=>{const id=document.getElementById("calendarActivitySelect").value;if(!id)return alert("請先選擇活動");if(calendarSyncBusy)return;calendarSyncBusy=true;try{alert(await syncActivityCalendar(id,"sync")?"日曆已同步":"日曆同步失敗："+(syncActivityCalendar.lastError||"請查看待同步訊息。"));}finally{calendarSyncBusy=false;renderCalendarSyncPanel();}};
+  const q=calendarQueue(),pending=Object.keys(q).filter(id=>q[id].error);
+  let panel=document.getElementById("calendarSyncPanel");
+  if(!pending.length){panel?.remove();return;}
+  if(!panel){panel=document.createElement("section");panel.id="calendarSyncPanel";panel.className="panel";view.prepend(panel);}
+  panel.innerHTML='<h3>日曆同步提醒</h3><p>有 '+pending.length+' 筆活動尚未完成日曆同步。</p><button type="button" class="ghost-btn" id="calendarRetry" '+(calendarSyncBusy?'disabled':'')+'>重試待同步</button>'+pending.map(id=>'<p class="hint">'+esc(activities.find(a=>a.id===id)?.title||"已刪除活動")+'：'+esc(q[id].error)+'</p>').join("");
   document.getElementById("calendarRetry").onclick=async()=>{if(calendarSyncBusy)return;calendarSyncBusy=true;try{for(const [id,item] of Object.entries(calendarQueue())){if(!await syncActivityCalendar(id,item.action)){alert("日曆同步失敗："+(syncActivityCalendar.lastError||"請稍後再試"));break;}}}finally{calendarSyncBusy=false;renderCalendarSyncPanel();}};
 }
