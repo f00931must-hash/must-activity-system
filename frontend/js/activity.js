@@ -1,3 +1,4 @@
+import { renderCourse } from "./course-student.js?v=1.0.0";
 
 import { db } from "../../shared/js/firebase-app.js";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc, increment, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
@@ -45,6 +46,7 @@ function renderHeader(){
 }
 
 function renderForm(){
+  if(activity.contentType==="course"){renderCourse(activity,$("registerPanel"));return;}
   const cap = Number(activity.capacity || 0);
   const reg = Number(activity.registeredCount || 0);
   const openAt = parseLocalTime(activity.registerOpenAt);
