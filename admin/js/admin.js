@@ -970,13 +970,20 @@ async function viewRegistrations(id){
   const snap = await getDocs(collection(db, "activities", id, "registrations"));
   const insuranceSnap = (a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? await getDocs(collection(db, "activities", id, "insurance")) : null;
   const insuranceMap = new Map((insuranceSnap?.docs || []).map(d=>[d.id,d.data()]));
-  const rows = snap.docs.map(d=>({docId:d.id,...d.data(),...(insuranceMap.get(d.id)||{})}));
+  const registrationTime = value => {
+    if(typeof value?.toMillis === "function") return value.toMillis();
+    if(typeof value?.seconds === "number") return value.seconds*1000+(value.nanoseconds||0)/1000000;
+    const parsed=typeof value==="number"?value:Date.parse(value);
+    return Number.isFinite(parsed)?parsed:Number.MAX_SAFE_INTEGER;
+  };
+  const rows = [...snap.docs].sort((a,b)=>registrationTime(a.data().createdAt)-registrationTime(b.data().createdAt)||a.id.localeCompare(b.id))
+    .map(d=>({docId:d.id,...d.data(),...(insuranceMap.get(d.id)||{})}));
   const custom = a.registerFields || [];
   const table = rows.length ? `<table class="data-table">
     <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th>${a.fixedFields?.birthDate?"<th>出生年月日</th>":""}${a.fixedFields?.nationalId?"<th>身分證字號</th>":""}<th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td>${a.fixedFields?.birthDate?`<td>${esc(r.birthDate||"")}</td>`:""}${a.fixedFields?.nationalId?`<td>${esc(maskNationalId(r.nationalId||""))}</td>`:""}<td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
-  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<div class="registration-download-actions"><button class="primary-btn" data-export-regs="${id}">下載簽到表</button>${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${id}">下載保險名單</button>` : ""}</div>`);
+  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2 data-registration-list>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<div class="registration-download-actions"><button class="primary-btn" data-export-regs="${id}">下載簽到表</button>${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${id}">下載保險名單</button>` : ""}</div>`);
   $("modal")?.classList.remove("hidden");
   document.querySelectorAll(".assigned-session-select").forEach(el=>el.onchange=async()=>{await updateDoc(doc(db,"activities",el.dataset.activity,"registrations",el.dataset.reg),{assignedSession:el.value,updatedAt:serverTimestamp()});});
 }
@@ -2117,7 +2124,7 @@ const activityForm = $("activityForm");
 if(activityForm) activityForm.addEventListener("submit", saveActivity);
 
 document.addEventListener("click", async (e) => {
-  if(e.target.closest("[data-modal-close]") || e.target.id === "modal"){
+  if(e.target.closest("[data-modal-close]") || (e.target.id === "modal" && !$("modalContent")?.querySelector("[data-registration-list]"))){
     closeModal();
     return;
   }
