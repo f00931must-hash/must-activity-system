@@ -1142,9 +1142,13 @@ async function exportInsuranceList(id){
   const week = weekdayText(a.date).replace("星期","");
   const plan = displayPlannedTime(a).replace(/-/g,"~");
   const title = `${roc}${week ? `（${week}）` : ""}${plan ? ` ${plan}` : ""}`;
-  const body = rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name||"")}</td><td style="mso-number-format:'\\@'">${esc(r.nationalId||"")}</td><td style="mso-number-format:'\\@'">${esc(r.birthDate||"")}</td></tr>`).join("");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><style>table{border-collapse:collapse;font-family:'Microsoft JhengHei',sans-serif}td,th{border:1px solid #000;padding:6px 10px;text-align:center}.title{font-size:16pt;font-weight:bold}</style></head><body><table><tr><th class="title" colspan="4">${esc(title)}</th></tr><tr><th>編號</th><th>姓名</th><th>身分證字號</th><th>出生年月日</th></tr>${body}</table></body></html>`;
-  downloadFile(`${a.title||"活動"}_保險名單.xls`, "\ufeff"+html, "application/vnd.ms-excel;charset=utf-8");
+  try{
+    const buffer=await buildInsuranceXlsx(title,rows);
+    downloadFile(`${String(a.title||"活動").replace(/[\\\\/:*?"<>|]/g,"_")}_保險名單.xlsx`,buffer,"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  }catch(err){
+    console.error("Insurance Excel export failed",err);
+    alert("保險名單下載失敗："+(err?.message||err));
+  }
 }
 
 async function viewFeedbacks(id){
@@ -2268,4 +2272,21 @@ function renderCalendarSyncPanel(){
   if(!panel){panel=document.createElement("section");panel.id="calendarSyncPanel";panel.className="panel";view.prepend(panel);}
   panel.innerHTML='<h3>日曆同步提醒</h3><p>有 '+pending.length+' 筆活動尚未完成日曆同步。</p><button type="button" class="ghost-btn" id="calendarRetry" '+(calendarSyncBusy?'disabled':'')+'>重試待同步</button>'+pending.map(id=>'<p class="hint">'+esc(activities.find(a=>a.id===id)?.title||"已刪除活動")+'：'+esc(q[id].error)+'</p>').join("");
   document.getElementById("calendarRetry").onclick=async()=>{if(calendarSyncBusy)return;calendarSyncBusy=true;try{for(const [id,item] of Object.entries(calendarQueue())){if(!await syncActivityCalendar(id,item.action)){alert("日曆同步失敗："+(syncActivityCalendar.lastError||"請稍後再試"));break;}}}finally{calendarSyncBusy=false;renderCalendarSyncPanel();}};
+}
+
+// A self-contained OOXML workbook: text IDs/dates stay text, with no linked .files directory.
+async function buildInsuranceXlsx(title,rows){
+  if(!window.JSZip)throw new Error("Excel 元件尚未載入，請重新整理後再試。");
+  const xml=value=>String(value??"").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]));
+  const zip=new window.JSZip();
+  const header='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const cell=(ref,value,style=0)=>`<c r="${ref}" s="${style}" t="inlineStr"><is><t xml:space="preserve">${xml(value)}</t></is></c>`;
+  const records=rows.map((r,i)=>`<row r="${i+3}" ht="26" customHeight="1">${cell('A'+(i+3),i+1)}${cell('B'+(i+3),r.name||'')}${cell('C'+(i+3),r.nationalId||'')}${cell('D'+(i+3),r.birthDate||'')}</row>`).join('');
+  zip.file('[Content_Types].xml',header+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+  zip.file('_rels/.rels',header+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+  zip.file('xl/workbook.xml',header+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="保險名單" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Titles" localSheetId="0">保險名單!$1:$2</definedName></definedNames></workbook>');
+  zip.file('xl/_rels/workbook.xml.rels',header+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  zip.file('xl/styles.xml',header+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="12"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="14"/><name val="Microsoft JhengHei"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
+  zip.file('xl/worksheets/sheet1.xml',header+`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:D${rows.length+2}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="26"/><cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="18" customWidth="1"/><col min="3" max="4" width="24" customWidth="1"/></cols><sheetData><row r="1" ht="36" customHeight="1">${cell('A1',title,1)}</row><row r="2" ht="28" customHeight="1">${['編號','姓名','身分證字號','出生年月日'].map((v,i)=>cell('ABCD'[i]+'2',v,1)).join('')}</row>${records}</sheetData><mergeCells count="1"><mergeCell ref="A1:D1"/></mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`);
+  return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
