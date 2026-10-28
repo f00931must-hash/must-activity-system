@@ -1052,77 +1052,19 @@ async function lookupStudentActivities(){
 }
 
 async function exportRegistrations(id){
-  const a = activities.find(x=>x.id===id);
-  const snap = await getDocs(collection(db, "activities", id, "registrations"));
-  const rows = snap.docs.map(d=>d.data());
-  const planTime = displayPlannedTime(a);
-  const rocActivityDate = activityRocDateWithWeekday(a);
-  const timeText = planTime ? `${rocActivityDate} ${esc(planTime)}` : rocActivityDate;
-  const headerLine = `${esc(a.academicYear || "")} 學年度第 ${esc(a.semester || "")} 學期 健康與諮商中心`;
-  const titleLine = `資源教室「${esc(a.title || "")}」活動簽到表`;
-
-  const minRows = 30;
-  const pairedRows = [];
-  for(let i=0; i<Math.max(rows.length, minRows); i+=2){
-    pairedRows.push([rows[i] || null, rows[i+1] || null]);
+  const a=activities.find(x=>x.id===id);
+  if(!a)return alert("找不到活動資料。");
+  try{
+    const snap=await getDocs(collection(db,"activities",id,"registrations"));
+    const rows=snap.docs.map(d=>d.data());
+    const planTime=displayPlannedTime(a),rocActivityDate=activityRocDateWithWeekday(a);
+    const timeText=planTime?`${rocActivityDate} ${planTime}`:rocActivityDate;
+    const buffer=await buildSignInDocx(a,rows,timeText);
+    downloadFile(String(a.title||"活動").replace(/[\\\\/:*?"<>|]/g,"_")+"_簽到表.docx",buffer,"application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  }catch(err){
+    console.error("Sign-in Word export failed",err);
+    alert("簽到表下載失敗："+(err?.message||err));
   }
-
-  // 1cm 約 37.8px；Word width 屬性用 px 近似。
-  // 姓名 2.1cm、簽到 2.1cm、單位／班級 3cm、性別 2.1cm。
-  const wName = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
-  const wSign = 'style="width:2.1cm;mso-width-source:userset;mso-width-alt:1191" width="79"';
-  const wDept = 'style="width:3cm;mso-width-source:userset;mso-width-alt:1701" width="113"';
-  const wGender = 'style="width:2.3cm;mso-width-source:userset;mso-width-alt:1304;text-align:center;white-space:nowrap" width="87"';
-
-  function genderMark(gender){
-    if(gender === "男") return "■男 □女";
-    if(gender === "女") return "□男 ■女";
-    return "□男 □女";
-  }
-
-  function block(r){
-    if(!r){
-      return `<td class="name-cell" ${wName}></td><td class="sign-cell" ${wSign}></td><td class="dept-cell" ${wDept}></td><td class="gender-cell" ${wGender}>□男 □女</td>`;
-    }
-    return `<td class="name-cell" ${wName}>${esc(r.name || "")}</td><td class="sign-cell" ${wSign}></td><td class="dept-cell" ${wDept}>${esc(r.department || "")}</td><td class="gender-cell" ${wGender}>${genderMark(r.biologicalSex || "")}</td>`;
-  }
-
-  const bodyRows = pairedRows.map(pair=>`<tr style="height:0.92cm">${block(pair[0])}${block(pair[1])}</tr>`).join("");
-
-  const html = `<!doctype html><html><head><meta charset="utf-8">
-  <style>
-    @page WordSection1{size:595.3pt 841.9pt;margin:36pt 36pt 36pt 36pt;mso-header-margin:0pt;mso-footer-margin:0pt}
-    div.WordSection1{page:WordSection1}
-    body{font-family:'DFKai-SB','標楷體','BiauKai',serif;font-size:12pt;line-height:1.35;margin:0}
-    .top{font-size:16pt;text-align:center;font-weight:bold;line-height:1.35}
-    h1{font-size:20pt;text-align:center;margin:4pt 0 10pt;font-family:'DFKai-SB','標楷體','BiauKai',serif}
-    .meta{font-size:12pt;margin:4pt 0}
-    table{border-collapse:collapse;table-layout:fixed;width:19cm;font-size:12pt;margin-top:8pt;mso-table-layout-alt:fixed}
-    td,th{border:1px solid #333;padding:2pt;vertical-align:middle;font-size:12pt;height:0.92cm;overflow:hidden;mso-padding-alt:2pt 2pt 2pt 2pt}
-    th{text-align:center;font-weight:bold}
-    .name-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
-    .sign-cell{width:2.1cm;mso-width-source:userset;mso-width-alt:1191}
-    .dept-cell{width:3cm;mso-width-source:userset;mso-width-alt:1701}
-    .gender-cell{width:2.3cm;mso-width-source:userset;mso-width-alt:1304;text-align:center;white-space:nowrap}
-  </style></head><body><div class="WordSection1">
-    <div class="top">${headerLine}</div>
-    <h1>${titleLine}</h1>
-    <p class="meta">時間：${timeText}</p>
-    <p class="meta">地點：${esc(a.location || "")}</p>
-    <table width="718" style="width:19cm;table-layout:fixed">
-      <colgroup>
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="87" style="width:2.3cm">
-        <col width="79" style="width:2.1cm"><col width="79" style="width:2.1cm"><col width="113" style="width:3cm"><col width="87" style="width:2.3cm">
-      </colgroup>
-      <tr style="height:0.92cm">
-        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>單位／班級</th><th class="gender-cell" ${wGender}>生理性別</th>
-        <th class="name-cell" ${wName}>姓名</th><th class="sign-cell" ${wSign}>簽到欄</th><th class="dept-cell" ${wDept}>單位／班級</th><th class="gender-cell" ${wGender}>生理性別</th>
-      </tr>
-      ${bodyRows}
-    </table>
-  </div></body></html>`;
-
-  downloadFile((a.title || "活動") + "_簽到表.doc", html, "application/msword");
 }
 
 async function exportInsuranceList(id){
@@ -2288,5 +2230,33 @@ async function buildInsuranceXlsx(title,rows){
   zip.file('xl/_rels/workbook.xml.rels',header+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
   zip.file('xl/styles.xml',header+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="12"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="14"/><name val="Microsoft JhengHei"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left style="thin"/><right style="thin"/><top style="thin"/><bottom style="thin"/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="49" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="49" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>');
   zip.file('xl/worksheets/sheet1.xml',header+`<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:D${rows.length+2}"/><sheetViews><sheetView workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="26"/><cols><col min="1" max="1" width="9" customWidth="1"/><col min="2" max="2" width="18" customWidth="1"/><col min="3" max="4" width="24" customWidth="1"/></cols><sheetData><row r="1" ht="36" customHeight="1">${cell('A1',title,1)}</row><row r="2" ht="28" customHeight="1">${['編號','姓名','身分證字號','出生年月日'].map((v,i)=>cell('ABCD'[i]+'2',v,1)).join('')}</row>${records}</sheetData><mergeCells count="1"><mergeCell ref="A1:D1"/></mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`);
+  return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+
+// Native WordprocessingML, with the existing sign-in sheet's dimensions and typography.
+async function buildSignInDocx(activity,registrations,timeText){
+  if(!window.JSZip)throw Error("Word 元件尚未載入，請重新整理後再試。");
+  const zip=new window.JSZip(),head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const xml=v=>String(v??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+  const run=(text,size=24,bold=false)=>`<w:r><w:rPr><w:rFonts w:ascii="DFKai-SB" w:hAnsi="DFKai-SB" w:eastAsia="標楷體" w:cs="DFKai-SB"/>${bold?'<w:b/><w:bCs/>':''}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr>${String(text??'').split(/\r?\n/).map((line,i)=>(i?'<w:br/>':'')+`<w:t xml:space="preserve">${xml(line)}</w:t>`).join('')}</w:r>`;
+  const paragraph=(text,size=24,bold=false,center=false,before=0,after=0)=>`<w:p><w:pPr><w:spacing w:before="${before}" w:after="${after}" w:line="324" w:lineRule="auto"/>${center?'<w:jc w:val="center"/>':''}</w:pPr>${run(text,size,bold)}</w:p>`;
+  const widths=[1191,1191,1701,1304,1191,1191,1701,1304];
+  const cell=(text,col,bold=false)=>`<w:tc><w:tcPr><w:tcW w:w="${widths[col]}" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>${paragraph(text,24,bold,col%4===3||bold)}</w:tc>`;
+  const gender=g=>g==='男'?'■男 □女':g==='女'?'□男 ■女':'□男 □女';
+  const block=(person,col)=>cell(person?.name||'',col)+cell('',col+1)+cell(person?.department||'',col+2)+cell(gender(person?.biologicalSex),col+3);
+  const row=content=>`<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="522" w:hRule="atLeast"/></w:trPr>${content}</w:tr>`;
+  let body=row(['姓名','簽到欄','單位／班級','生理性別','姓名','簽到欄','單位／班級','生理性別'].map((text,i)=>cell(text,i,true)).join(''));
+  for(let i=0;i<Math.max(30,registrations.length);i+=2)body+=row(block(registrations[i],0)+block(registrations[i+1],4));
+  const borders=['top','left','bottom','right','insideH','insideV'].map(edge=>`<w:${edge} w:val="single" w:sz="6" w:color="333333"/>`).join('');
+  const table=`<w:tbl><w:tblPr><w:tblW w:w="10774" w:type="dxa"/><w:jc w:val="left"/><w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${body}</w:tbl>`;
+  const doc=paragraph(`${activity.academicYear||''} 學年度第 ${activity.semester||''} 學期 健康與諮商中心`,32,true,true)
+    +paragraph(`資源教室「${activity.title||''}」活動簽到表`,40,true,true,80,200)
+    +paragraph('時間：'+timeText,24,false,false,80,80)
+    +paragraph('地點：'+(activity.location||''),24,false,false,80,240)+table;
+  zip.file('[Content_Types].xml',head+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>');
+  zip.file('_rels/.rels',head+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+  zip.file('word/_rels/document.xml.rels',head+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+  zip.file('word/styles.xml',head+'<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="DFKai-SB" w:hAnsi="DFKai-SB" w:eastAsia="標楷體"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="324" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults></w:styles>');
+  zip.file('word/document.xml',head+`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${doc}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`);
   return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
