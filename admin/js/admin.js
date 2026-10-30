@@ -1,4 +1,4 @@
-import {buildStudentAnnouncement} from "./student-announcement.js?v=1.0.1";
+import {buildStudentAnnouncement} from "./student-announcement.js?v=1.0.2";
 
 import { db, auth } from "../../shared/js/firebase-app.js";
 import { builtInAdmins, siteConfig } from "../../shared/js/firebase-config.js";
@@ -2267,10 +2267,15 @@ async function buildSignInDocx(activity,registrations,timeText){
 }
 
 
-function renderStudentAnnouncement(){
+let announcementGeneration=0;
+async function renderStudentAnnouncement(){
  const textarea=$("studentAnnouncementText"),copy=$("copyStudentAnnouncementBtn");if(!textarea||!copy)return;
  if(!announcementActivitiesReady){setText("studentAnnouncementStatus","活動資料載入中，請稍候按重新產生。");copy.disabled=true;return}
- const result=buildStudentAnnouncement(activities,siteConfig.baseUrl);textarea.value=result.text;copy.disabled=!result.rows.length;setText("studentAnnouncementStatus",result.rows.length?`目前共 ${result.rows.length} 個可報名活動，可修改文字後複製。`:"目前沒有可報名的活動。");
+ const generation=++announcementGeneration,previous=textarea.value;copy.disabled=true;setText("studentAnnouncementStatus","正在整理活動與檢查短連結…");
+ let shortBase='';try{const response=await fetch('https://must-go.f00931-must.workers.dev/health',{signal:AbortSignal.timeout(2500),cache:'no-store'});const data=await response.json();if(response.ok&&data.ok&&data.service==='must-activity-shortlinks')shortBase='https://must-go.f00931-must.workers.dev'}catch{}
+ if(generation!==announcementGeneration)return;
+ if(textarea.value!==previous){copy.disabled=!textarea.value.trim();setText("studentAnnouncementStatus","已保留你編輯的公告；需要更新連結時請按重新產生。");return}
+ const result=buildStudentAnnouncement(activities,siteConfig.baseUrl,Date.now(),{shortBase});textarea.value=result.text;copy.disabled=!result.rows.length;setText("studentAnnouncementStatus",result.rows.length?`目前共 ${result.rows.length} 個可報名活動，可修改文字後複製。`:"目前沒有可報名的活動。");
 }
 $("refreshStudentAnnouncementBtn")?.addEventListener("click",renderStudentAnnouncement);
 $("copyStudentAnnouncementBtn")?.addEventListener("click",async()=>{
