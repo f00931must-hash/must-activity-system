@@ -16,9 +16,15 @@ export function announcementActivities(activities,now=Date.now()){
   return !dates.length||dates.sort().at(-1)>=today;
  }).sort((a,b)=>String(a.date||'9999').localeCompare(String(b.date||'9999'))||String(a.title||'').localeCompare(String(b.title||''),'zh-Hant'));
 }
+export function announcementDate(a){
+ const format=value=>{const text=String(value||'');if(!/^\d{4}-\d{2}-\d{2}$/.test(text))return '';const day=new Date(text+'T00:00:00Z');if(!Number.isFinite(day.getTime())||day.toISOString().slice(0,10)!==text)return '';return Number(text.slice(5,7))+'/'+Number(text.slice(8,10))+'（'+'日一二三四五六'[day.getUTCDay()]+'）'};
+ if(a.multiSessionEnabled){const dates=[...new Set((a.sessions||[]).map(s=>s.date).filter(Boolean))].sort().map(format).filter(Boolean);if(dates.length)return dates.join('、')}
+ const start=format(a.date),end=a.dateMode==='multi'?format(a.endDate):'';
+ return start&&end&&a.date!==a.endDate?start+'～'+end:start;
+}
 export function buildStudentAnnouncement(activities,baseUrl,now=Date.now()){
  const rows=announcementActivities(activities,now);
  if(!rows.length)return {text:'目前沒有可報名的活動。',rows};
- const text='近期活動要玩什麼？歡迎各位報名！\n\n'+rows.map((a,i)=>{const url=new URL('frontend/activity.html',baseUrl.endsWith('/')?baseUrl:baseUrl+'/');url.searchParams.set('id',a.id);return `${i+1}. ${String(a.title||'未命名活動').replace(/\s+/g,' ').trim()}\n報名連結：${url.href}`}).join('\n\n');
+ const text='近期活動要玩什麼？歡迎各位踴躍報名參加！\n\n'+rows.map((a,i)=>{const url=new URL('frontend/activity.html',baseUrl.endsWith('/')?baseUrl:baseUrl+'/');url.searchParams.set('id',a.id);const date=announcementDate(a);return `${i+1}. ${String(a.title||'未命名活動').replace(/\s+/g,' ').trim()}${date?'｜'+date:''}\n報名連結：${url.href}`}).join('\n\n');
  return {text,rows};
 }
