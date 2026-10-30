@@ -1,3 +1,4 @@
+import {buildStudentAnnouncement} from "./student-announcement.js?v=1.0.0";
 
 import { db, auth } from "../../shared/js/firebase-app.js";
 import { builtInAdmins, siteConfig } from "../../shared/js/firebase-config.js";
@@ -8,6 +9,7 @@ const $ = (id) => document.getElementById(id);
 const provider = new GoogleAuthProvider();
 
 let activities = [];
+let announcementActivitiesReady=false;
 let adminEmails = [];
 let adminUsers = [];
 let systemTags = [];
@@ -74,13 +76,14 @@ function renderAdmins(){ /* 權限由 Portal 統一管理 */
 }
 
 function showView(view){
+  if(view === "announcement") renderStudentAnnouncement();
   document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.classList.add("hidden"));
   $("view-" + view)?.classList.remove("hidden");
   if(view === "files") setTimeout(refreshFiles, 50);
   if(view === "history") setTimeout(loadAuditHistory, 50);
   if(view === "certification") setTimeout(()=>{ renderCertificationSelectors(); }, 50);
-  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",students:"學生查詢",stats:"統計分析",files:"檔案管理",history:"歷史紀錄",tags:"標籤管理",certification:"認證時數",settings:"系統設定"}[view] || "管理平台");
+  setText("pageTitle", {dashboard:"儀表板",activities:"活動管理",announcement:"學生公告",students:"學生查詢",stats:"統計分析",files:"檔案管理",history:"歷史紀錄",tags:"標籤管理",certification:"認證時數",settings:"系統設定"}[view] || "管理平台");
 }
 
 function closeModal(){
@@ -91,6 +94,8 @@ function listenActivities(){
   if(unsubscribe) return;
   unsubscribe = onSnapshot(query(collection(db, "activities"), orderBy("date", "desc")), snap => {
     activities = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    announcementActivitiesReady=true;
+    if(!$("view-announcement")?.classList.contains("hidden")&&!val("studentAnnouncementText"))renderStudentAnnouncement();
     syncCertificationTermControls();
     updateStats();
     buildDashboardFilters();
@@ -2260,3 +2265,15 @@ async function buildSignInDocx(activity,registrations,timeText){
   zip.file('word/document.xml',head+`<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${doc}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="720" w:right="720" w:bottom="720" w:left="720" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`);
   return zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }
+
+
+function renderStudentAnnouncement(){
+ const textarea=$("studentAnnouncementText"),copy=$("copyStudentAnnouncementBtn");if(!textarea||!copy)return;
+ if(!announcementActivitiesReady){setText("studentAnnouncementStatus","活動資料載入中，請稍候按重新產生。");copy.disabled=true;return}
+ const result=buildStudentAnnouncement(activities,siteConfig.baseUrl);textarea.value=result.text;copy.disabled=!result.rows.length;setText("studentAnnouncementStatus",result.rows.length?`目前共 ${result.rows.length} 個可報名活動，可修改文字後複製。`:"目前沒有可報名的活動。");
+}
+$("refreshStudentAnnouncementBtn")?.addEventListener("click",renderStudentAnnouncement);
+$("copyStudentAnnouncementBtn")?.addEventListener("click",async()=>{
+ const textarea=$("studentAnnouncementText");if(!textarea?.value.trim())return;
+ try{await navigator.clipboard.writeText(textarea.value);setText("studentAnnouncementStatus","已複製，可貼到學生群組或公告。")}catch{textarea.focus();textarea.select();setText("studentAnnouncementStatus","瀏覽器未允許自動複製，文字已選取，請按 Ctrl＋C（手機可長按複製）。")}
+});
