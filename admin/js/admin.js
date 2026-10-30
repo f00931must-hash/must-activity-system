@@ -1,4 +1,4 @@
-import {buildStudentAnnouncement} from "./student-announcement.js?v=1.0.0";
+import {buildStudentAnnouncement} from "./student-announcement.js?v=1.0.1";
 
 import { db, auth } from "../../shared/js/firebase-app.js";
 import { builtInAdmins, siteConfig } from "../../shared/js/firebase-config.js";
