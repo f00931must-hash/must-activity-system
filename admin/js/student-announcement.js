@@ -22,9 +22,9 @@ export function announcementDate(a){
  const start=format(a.date),end=a.dateMode==='multi'?format(a.endDate):'';
  return start&&end&&a.date!==a.endDate?start+'～'+end:start;
 }
-export function buildStudentAnnouncement(activities,baseUrl,now=Date.now()){
+export function buildStudentAnnouncement(activities,baseUrl,now=Date.now(),options={}){
  const rows=announcementActivities(activities,now);
  if(!rows.length)return {text:'目前沒有可報名的活動。',rows};
- const text='近期活動要玩什麼？歡迎各位踴躍報名參加！\n\n'+rows.map((a,i)=>{const url=new URL('frontend/activity.html',baseUrl.endsWith('/')?baseUrl:baseUrl+'/');url.searchParams.set('id',a.id);const date=announcementDate(a);return `${i+1}. ${String(a.title||'未命名活動').replace(/\s+/g,' ').trim()}${date?'｜'+date:''}\n報名連結：${url.href}`}).join('\n\n');
+ const text='近期活動要玩什麼？歡迎各位踴躍報名參加！\n\n'+rows.map((a,i)=>{const url=new URL('frontend/activity.html',baseUrl.endsWith('/')?baseUrl:baseUrl+'/');url.searchParams.set('id',a.id);const link=options.shortBase&&/^[A-Za-z0-9_-]{1,128}$/.test(a.id)?options.shortBase.replace(/\/$/,'')+'/a/'+a.id:url.href;const date=announcementDate(a);return `${i+1}. ${String(a.title||'未命名活動').replace(/\s+/g,' ').trim()}${date?'｜'+date:''}\n報名連結：${link}`}).join('\n\n');
  return {text,rows};
 }
