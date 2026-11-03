@@ -108,7 +108,7 @@ function updateStats(){
   setText("statActivities", activities.length);
   setText("statRegs", activities.reduce((s,a)=>s+Number(a.registeredCount||0),0));
   setText("statFeedbacks", activities.reduce((s,a)=>s+Number(a.feedbackCount||0),0));
-  setText("statOpenActivities", activities.filter(a=>a.status==="open").length);
+  setText("statOpenActivities", activities.filter(a=>effectiveActivityStatus(a)==="open").length);
 }
 
 function ownerEmailOf(a){ return String(a.ownerTeacherEmail||a.createdByEmail||"").trim().toLowerCase(); }
@@ -180,7 +180,7 @@ function dashboardFilteredActivities(){
     if(term&&`${a.academicYear||""}-${a.semester||""}`!==term)return false;
     if(teacher==="__unassigned__"&&email)return false;
     if(teacher&&teacher!=="__unassigned__"&&email!==teacher)return false;
-    if(status&&a.status!==status)return false;
+    if(status&&effectiveActivityStatus(a)!==status)return false;
     return true;
   });
 }
@@ -205,7 +205,7 @@ function dashboardCard(a){
   const fbUrl = siteConfig.baseUrl + "frontend/feedback.html?id=" + a.id;
   return `<article class="dashboard-activity-card">
     <div class="dashboard-activity-main">
-      <div class="dashboard-activity-title"><h3>${esc(a.title||"未命名活動")}</h3><span class="badge">${esc(statusText(a.status))}</span></div>
+      <div class="dashboard-activity-title"><h3>${esc(a.title||"未命名活動")}</h3><span class="badge">${esc(statusText(effectiveActivityStatus(a)))}</span></div>
       <div class="dashboard-activity-meta">
         <span><small>學期</small><strong>${esc(sem)}</strong></span>
         <span><small>日期</small><strong>${esc(activityDateText(a)||"—")}</strong></span>
@@ -233,7 +233,7 @@ function card(a){
   const sem = a.academicYear && a.semester ? `${a.academicYear}學年度第${a.semester}學期` : "—";
   return `<article class="activity-admin-card">
     <div class="activity-card-main">
-      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(a.status)}</span>${tagHtml([...activityCertificationTags(a), ...(a.tags || [])].filter(Boolean))}</div></div>
+      <div class="activity-title-row"><h3>${esc(a.title)}</h3><div class="status-tags"><span class="badge">${statusText(effectiveActivityStatus(a))}</span>${tagHtml([...activityCertificationTags(a), ...(a.tags || [])].filter(Boolean))}</div></div>
       <div class="activity-info-grid">
         <div><strong>學期</strong><span>${esc(sem)}</span></div>
         <div><strong>日期</strong><span>📅 ${esc(activityDateText(a))}</span></div>
@@ -1650,6 +1650,21 @@ function toggleDateMode(){
 }
 function formatDateTime(v){ return String(v || "").replace("T"," "); }
 function round(n){ return Math.round(n*10)/10; }
+function effectiveActivityStatus(a, now=Date.now()){
+  const status=a.status||"open";
+  if(status!=="open")return status;
+  const validDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||""))&&Number.isFinite(Date.parse(d+"T00:00:00+08:00"));
+  const endTime=String(a.activityTime||a.plannedTime||a.time||"").match(/(\d{1,2}:\d{2})\s*$/)?.[1];
+  const rows=a.multiSessionEnabled&&Array.isArray(a.sessions)&&a.sessions.some(s=>validDate(s.date))
+    ? a.sessions.filter(s=>validDate(s.date)).map(s=>({date:s.date,time:s.endTime}))
+    : [{date:a.dateMode==="multi"&&validDate(a.endDate)&&a.endDate>=a.date?a.endDate:a.date,time:endTime}];
+  const ends=rows.filter(r=>validDate(r.date)).map(r=>{
+    const time=/^([01]?\d|2[0-3]):[0-5]\d$/.test(String(r.time||""))?r.time.padStart(5,"0")+":00":"23:59:59.999";
+    return Date.parse(r.date+"T"+time+"+08:00");
+  });
+  return ends.length&&now>Math.max(...ends)?"closed":status;
+}
+
 function statusText(s){ return {open:"報名中",feedback:"回饋中",closed:"已結束",draft:"草稿"}[s] || "活動"; }
 function tagColorClass(tag){
   const classes = ["tag-blue","tag-green","tag-yellow","tag-purple","tag-rose","tag-orange"];
@@ -1736,7 +1751,7 @@ async function runStatistics(){
 
   let picked = activities.filter(a => activityInStatRange(a, mode, year, start, end));
   if(!includeDraft) picked = picked.filter(a => a.published !== false);
-  if(!includeClosed) picked = picked.filter(a => a.status !== "closed");
+  if(!includeClosed) picked = picked.filter(a => effectiveActivityStatus(a) !== "closed");
   if(!includeEmpty) picked = picked.filter(a => Number(a.registeredCount || 0) > 0);
 
   const details = await collectActivityDetails(picked);
@@ -2282,3 +2297,6 @@ $("copyStudentAnnouncementBtn")?.addEventListener("click",async()=>{
  const textarea=$("studentAnnouncementText");if(!textarea?.value.trim())return;
  try{await navigator.clipboard.writeText(textarea.value);setText("studentAnnouncementStatus","已複製，可貼到學生群組或公告。")}catch{textarea.focus();textarea.select();setText("studentAnnouncementStatus","瀏覽器未允許自動複製，文字已選取，請按 Ctrl＋C（手機可長按複製）。")}
 });
+
+// Refresh date-derived labels while the dashboard remains open; no database writes.
+setInterval(()=>{if(announcementActivitiesReady){updateStats();renderLists();}},60000);
