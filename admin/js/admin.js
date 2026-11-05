@@ -2013,7 +2013,7 @@ function bindClick(id, handler){
 
 bindClick("loginBtn", async (e) => {
   e.preventDefault();
-  try { await signInWithPopup(auth, provider); }
+  try { await auth.authStateReady(); if(!auth.currentUser) await signInWithPopup(auth, provider); }
   catch(err){ console.error(err); alert("登入失敗：" + err.message); }
 });
 
