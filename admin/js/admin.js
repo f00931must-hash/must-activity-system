@@ -605,9 +605,8 @@ function imageOptionEditor(field, fieldIndex){
 function renderFbQuestions(){
   const html = fbQuestions.length ? fbQuestions.map((q,i)=>`
     <div class="field-item">
-      <div class="field-row">
-        <input class="field fb-question" data-i="${i}" value="${esc(q)}" placeholder="請輸入滿意度題目">
-        <span></span>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start">
+        <textarea class="field fb-question" data-i="${i}" rows="3" aria-label="滿意度題目 ${i+1}" style="width:100%;min-width:0;box-sizing:border-box;resize:vertical" placeholder="請輸入滿意度題目">${esc(q)}</textarea>
         <button type="button" class="ghost-btn fb-remove" data-i="${i}">移除</button>
       </div>
     </div>`).join("") : '<div class="empty">目前沒有滿意度題目，請按「新增滿意度題目」。</div>';
@@ -2260,13 +2259,13 @@ async function buildSignInDocx(activity,registrations,timeText){
   const xml=v=>String(v??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
   const run=(text,size=24,bold=false)=>`<w:r><w:rPr><w:rFonts w:ascii="DFKai-SB" w:hAnsi="DFKai-SB" w:eastAsia="標楷體" w:cs="DFKai-SB"/>${bold?'<w:b/><w:bCs/>':''}<w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr>${String(text??'').split(/\r?\n/).map((line,i)=>(i?'<w:br/>':'')+`<w:t xml:space="preserve">${xml(line)}</w:t>`).join('')}</w:r>`;
   const paragraph=(text,size=24,bold=false,center=false,before=0,after=0)=>`<w:p><w:pPr><w:spacing w:before="${before}" w:after="${after}" w:line="324" w:lineRule="auto"/>${center?'<w:jc w:val="center"/>':''}</w:pPr>${run(text,size,bold)}</w:p>`;
-  const widths=[1191,1191,1701,1304,1191,1191,1701,1304];
-  const cell=(text,col,bold=false)=>`<w:tc><w:tcPr><w:tcW w:w="${widths[col]}" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>${paragraph(text,24,bold,col%4===3||bold)}</w:tc>`;
+  const widths=[550,1090,1050,1393,1304,550,1090,1050,1393,1304];
+  const cell=(text,col,bold=false)=>`<w:tc><w:tcPr><w:tcW w:w="${widths[col]}" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>${paragraph(text,24,bold,col%5===0||col%5===4||bold)}</w:tc>`;
   const gender=g=>g==='男'?'■男 □女':g==='女'?'□男 ■女':'□男 □女';
-  const block=(person,col)=>cell(person?.name||'',col)+cell('',col+1)+cell(person?.department||'',col+2)+cell(gender(person?.biologicalSex),col+3);
+  const block=(person,col,number)=>cell(number,col)+cell(person?.name||'',col+1)+cell('',col+2)+cell(person?.department||'',col+3)+cell(gender(person?.biologicalSex),col+4);
   const row=content=>`<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="522" w:hRule="atLeast"/></w:trPr>${content}</w:tr>`;
-  let body=row(['姓名','簽到欄','單位／班級','生理性別','姓名','簽到欄','單位／班級','生理性別'].map((text,i)=>cell(text,i,true)).join(''));
-  for(let i=0;i<Math.max(30,registrations.length);i+=2)body+=row(block(registrations[i],0)+block(registrations[i+1],4));
+  let body=row(['編號','姓名','簽到欄','單位／班級','生理性別','編號','姓名','簽到欄','單位／班級','生理性別'].map((text,i)=>cell(text,i,true)).join(''));
+  for(let i=0;i<Math.max(30,registrations.length);i+=2)body+=row(block(registrations[i],0,i+1)+block(registrations[i+1],5,i+2));
   const borders=['top','left','bottom','right','insideH','insideV'].map(edge=>`<w:${edge} w:val="single" w:sz="6" w:color="333333"/>`).join('');
   const table=`<w:tbl><w:tblPr><w:tblW w:w="10774" w:type="dxa"/><w:jc w:val="left"/><w:tblBorders>${borders}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="40" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="40" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${widths.map(w=>`<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>${body}</w:tbl>`;
   const doc=paragraph(`${activity.academicYear||''} 學年度第 ${activity.semester||''} 學期 健康與諮商中心`,32,true,true)
