@@ -987,7 +987,7 @@ async function viewRegistrations(id){
     <thead><tr><th>#</th><th>姓名</th><th>單位／班級</th><th>學號／職員編號</th><th>聯絡電話</th><th>生理性別</th>${a.fixedFields?.birthDate?"<th>出生年月日</th>":""}${a.fixedFields?.nationalId?"<th>身分證字號</th>":""}<th>餐點</th>${a.multiSessionEnabled?"<th>可參加場次</th><th>老師安排場次</th>":""}${custom.map(f=>`<th>${esc(f.label)}</th>`).join("")}<th>操作</th></tr></thead>
     <tbody>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.department)}</td><td>${esc(r.studentId)}</td><td>${esc(r.phone)}</td><td>${esc(r.biologicalSex||"")}</td>${a.fixedFields?.birthDate?`<td>${esc(r.birthDate||"")}</td>`:""}${a.fixedFields?.nationalId?`<td>${esc(maskNationalId(r.nationalId||""))}</td>`:""}<td>${esc(r.meal)}</td>${a.multiSessionEnabled?`<td>${esc((r.availableSessions||[]).map(x=>sessionLabel(a,x)).join("、"))}</td><td><select class="field assigned-session-select" data-activity="${id}" data-reg="${esc(r.docId)}"><option value="">未安排</option>${(a.sessions||[]).map(x=>`<option value="${esc(x.id)}" ${r.assignedSession===x.id?"selected":""}>${esc(sessionLabel(a,x.id))}</option>`).join("")}</select></td>`:""}${custom.map(f=>`<td>${esc(Array.isArray(r.customAnswers?.[f.label])?r.customAnswers[f.label].join("、"):(r.customAnswers?.[f.label]||""))}</td>`).join("")}<td><button class="ghost-btn" data-edit-reg="${id}" data-student="${esc(r.docId)}">修改</button><button class="ghost-btn danger-btn" data-delete-reg="${id}" data-student="${esc(r.docId)}">刪除</button></td></tr>`).join("")}</tbody>
   </table>` : '<div class="empty">目前沒有人報名</div>';
-  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2 data-registration-list>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<div class="registration-download-actions"><button class="primary-btn" data-export-regs="${id}">下載簽到表</button>${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${id}">下載保險名單</button>` : ""}</div>`);
+  setHtml("modalContent", `<button class="modal-close" data-modal-close type="button">×</button><h2 data-registration-list>${esc(a.title)}｜報名名單 <span class="quick-count">${rows.length} 人</span></h2>${table}<div class="registration-download-actions"><button class="primary-btn" data-export-regs="${id}">下載簽到表</button>${(a.fixedFields?.birthDate || a.fixedFields?.nationalId) ? `<button class="ghost-btn" data-export-insurance="${id}">下載保險名單</button>` : ""}<button type="button" class="ghost-btn" data-registration-notes="${esc(id)}">備註名單</button></div>`);
   $("modal")?.classList.remove("hidden");
   document.querySelectorAll(".assigned-session-select").forEach(el=>el.onchange=async()=>{await updateDoc(doc(db,"activities",el.dataset.activity,"registrations",el.dataset.reg),{assignedSession:el.value,updatedAt:serverTimestamp()});});
 }
@@ -2115,6 +2115,8 @@ document.addEventListener("click", async (e) => {
   const openLinks = e.target.closest("[data-open-links]");
   if(openLinks) return openActivityLinks(openLinks.dataset.openLinks);
 
+  const notes = e.target.closest("[data-registration-notes]");
+  if(notes){ showRegistrationNotes(notes.dataset.registrationNotes).catch(err=>alert("備註名單無法開啟："+err.message)); return; }
   const viewRegs = e.target.closest("[data-view-regs]");
   if(viewRegs) return viewRegistrations(viewRegs.dataset.viewRegs);
 
@@ -2299,3 +2301,65 @@ $("copyStudentAnnouncementBtn")?.addEventListener("click",async()=>{
 
 // Refresh date-derived labels while the dashboard remains open; no database writes.
 setInterval(()=>{if(announcementActivitiesReady){updateStats();renderLists();}},60000);
+
+async function showRegistrationNotes(activityId){
+  const activity=activities.find(a=>a.id===activityId);
+  if(!activity)return;
+  const ref=doc(db,"settings","certificationAttendance");
+  const [registrations,settings]=await Promise.all([
+    getDocs(collection(db,"activities",activityId,"registrations")),getDoc(ref)
+  ]);
+  const rows=registrations.docs.map(d=>({id:d.id,data:d.data()}));
+  const saved=settings.data()?.registrationNotes?.[activityId]||{};
+  const columns=new Map(Object.entries(saved).sort((a,b)=>(a[1].order||0)-(b[1].order||0)));
+  const root=$("modalContent");
+  root.innerHTML=`<button class="modal-close" data-modal-close type="button">×</button>
+    <h2>${esc(activity.title)}｜備註名單</h2>
+    <p>新增項目（例如：保證金），再勾選對應的報名者。勾選後會自動儲存。</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <input class="field" data-note-label maxlength="40" aria-label="備註項目名稱" placeholder="例如：保證金">
+      <button type="button" class="ghost-btn" data-note-add>新增項目</button>
+      <button type="button" class="primary-btn" data-note-download>下載備註名單</button>
+      <button type="button" class="ghost-btn" data-view-regs="${esc(activityId)}">返回報名名單</button>
+    </div>
+    <p data-note-status role="status"></p><div data-note-table style="overflow:auto"></div>`;
+  $("modal")?.classList.remove("hidden");
+  const table=root.querySelector("[data-note-table]"),status=root.querySelector("[data-note-status]"),input=root.querySelector("[data-note-label]"),add=root.querySelector("[data-note-add]"),download=root.querySelector("[data-note-download]");
+  let saving=0;
+  const write=(key,patch)=>setDoc(ref,{registrationNotes:{[activityId]:{[key]:patch}}},{merge:true});
+  function render(){
+    const entries=[...columns];
+    table.innerHTML=rows.length?`<table><thead><tr><th>編號</th><th>姓名</th><th>單位／班級</th>${entries.map(([,c])=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
+      ${rows.map(({id,data},i)=>`<tr><td>${i+1}</td><td>${esc(data.name||"")}</td><td>${esc(data.department||"")}</td>${entries.map(([key,c])=>`<td><input type="checkbox" aria-label="${esc(data.name||"")}：${esc(c.label)}" data-note-key="${esc(key)}" data-note-reg="${esc(id)}" ${c.checked?.[id]===true?"checked":""}></td>`).join("")}</tr>`).join("")}
+    </tbody></table>`:'<div class="empty">目前沒有人報名。</div>';
+  }
+  table.onchange=async e=>{
+    const box=e.target.closest("[data-note-key]");if(!box)return;
+    const {noteKey:key,noteReg:id}=box.dataset,value=box.checked;
+    saving++;download.disabled=true;add.disabled=true;box.disabled=true;status.textContent="儲存中…";
+    try{
+      await write(key,{checked:{[id]:value}});
+      const c=columns.get(key);c.checked={...c.checked,[id]:value};
+      status.textContent="已儲存";
+    }catch(err){box.checked=!value;status.textContent="儲存失敗："+err.message;}
+    finally{box.disabled=false;if(--saving===0){download.disabled=false;add.disabled=false;}}
+  };
+  add.onclick=async()=>{
+    const label=input.value.trim();if(!label)return input.focus();
+    if([...columns.values()].some(c=>c.label===label)){status.textContent="這個項目已存在。";return;}
+    const key=crypto.randomUUID(),column={label,order:Date.now()};
+    add.disabled=true;download.disabled=true;table.inert=true;
+    try{await write(key,column);columns.set(key,column);input.value="";render();status.textContent="已新增項目";}
+    catch(err){status.textContent="新增失敗："+err.message;}
+    finally{add.disabled=false;download.disabled=false;table.inert=false;}
+  };
+  input.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();add.click();}};
+  download.onclick=()=>{
+    const cols=[...columns.values()];
+    const values=[["編號","姓名","單位／班級",...cols.map(c=>c.label)],...rows.map(({id,data},i)=>[i+1,data.name||"",data.department||"",...cols.map(c=>c.checked?.[id]===true?"✓":"")])];
+    const field=v=>{let s=String(v);if(/^[\s]*[=+@-]|^[\t\r\n]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};
+    const csv="\uFEFF"+values.map(row=>row.map(field).join(",")).join("\r\n");
+    downloadFile(activity.title+"_備註名單.csv",new TextEncoder().encode(csv),"text/csv;charset=utf-8");
+  };
+  render();
+}
