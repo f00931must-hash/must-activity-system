@@ -111,7 +111,15 @@ function updateStats(){
   setText("statOpenActivities", activities.filter(a=>effectiveActivityStatus(a)==="open").length);
 }
 
-function ownerEmailOf(a){ return String(a.ownerTeacherEmail||a.createdByEmail||"").trim().toLowerCase(); }
+const activityEmail=value=>String(value||"").trim().toLowerCase();
+function activityAdmin(email){return adminUsers.find(u=>activityEmail(u.email)===email);}
+function responsibleTeacher(email){
+  const user=activityAdmin(email);
+  if(user?.role!=="assistant")return email;
+  const owner=activityEmail(user.ownerEmail);
+  return owner&&owner!==email&&activityAdmin(owner)?.role!=="assistant"?owner:"";
+}
+function ownerEmailOf(a){return responsibleTeacher(activityEmail(a.ownerTeacherEmail||a.createdByEmail));}
 function syncedTeacherName(email){
   const key=String(email||"").trim().toLowerCase();
   const row=adminUsers.find(u=>String(u?.email||"").trim().toLowerCase()===key);
@@ -119,28 +127,30 @@ function syncedTeacherName(email){
 }
 function ownerNameOf(a){
   const email=ownerEmailOf(a);
-  return syncedTeacherName(email) || String(a.ownerTeacherName||a.createdByName||"").trim() || (email?email.split("@")[0]:"未標記");
+  const stored=activityEmail(a.ownerTeacherEmail||a.createdByEmail);
+  return syncedTeacherName(email) || (email&&email===stored?String(a.ownerTeacherName||a.createdByName||"").trim():"") || (email?email.split("@")[0]:"未標記老師");
 }
 
 function teacherNameMap(){
   const map=new Map();
   adminUsers.forEach(u=>{
+    if(u.role==="assistant")return;
     const email=String(u?.email||"").trim().toLowerCase();
     const name=String(u?.name||u?.displayName||"").trim();
     if(email&&name)map.set(email,name);
   });
   activities.forEach(a=>{
     const email=ownerEmailOf(a);
-    if(email&&!map.has(email))map.set(email,String(a.ownerTeacherName||a.createdByName||"").trim()||email.split("@")[0]);
+    if(email&&!map.has(email))map.set(email,ownerNameOf(a));
   });
   if(currentUser?.email){
     const email=String(currentUser.email).trim().toLowerCase();
     const name=syncedTeacherName(email)||String(currentUser.displayName||"").trim()||email.split("@")[0];
-    map.set(email,name);
+    if(activityAdmin(email)?.role!=="assistant")map.set(email,name);
   }
   adminEmails.forEach(raw=>{
     const email=String(raw||"").trim().toLowerCase();
-    if(email&&!map.has(email))map.set(email,email.split("@")[0]);
+    if(email&&activityAdmin(email)?.role!=="assistant"&&!map.has(email))map.set(email,email.split("@")[0]);
   });
   return map;
 }
@@ -883,10 +893,13 @@ async function saveActivity(event){
       data.registeredCount = 0;
       data.feedbackCount = 0;
       data.createdAt = serverTimestamp();
-      data.ownerTeacherEmail = String(currentUser?.email||"").trim().toLowerCase();
-      data.ownerTeacherName = syncedTeacherName(data.ownerTeacherEmail) || String(currentUser?.displayName||"").trim() || data.ownerTeacherEmail.split("@")[0];
-      data.createdByEmail = data.ownerTeacherEmail;
-      data.createdByName = data.ownerTeacherName;
+      const creatorEmail=activityEmail(currentUser?.email);
+      const teacherEmail=responsibleTeacher(creatorEmail);
+      if(!teacherEmail)throw new Error("協助同學尚未設定所屬老師，請在 Portal 設定並同步活動權限。");
+      data.createdByEmail=creatorEmail;
+      data.createdByName=syncedTeacherName(creatorEmail)||String(currentUser?.displayName||"").trim()||creatorEmail.split("@")[0];
+      data.ownerTeacherEmail=teacherEmail;
+      data.ownerTeacherName=syncedTeacherName(teacherEmail)||(teacherEmail===creatorEmail?data.createdByName:teacherEmail.split("@")[0]);
       const created = await addDoc(collection(db, "activities"), data);
       calendarActivityId=created.id;
       await writeAudit("新增", "活動", data.title, `活動 ID：${created.id}`);
