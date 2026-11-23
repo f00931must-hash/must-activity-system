@@ -55,7 +55,7 @@ function cleanUndefined(obj){
   return obj;
 }
 
-function isAdmin(email){ return adminEmails.includes(email); }
+function isAdmin(email){ return adminEmails.some(value => String(value || "").trim().toLowerCase() === String(email || "").trim().toLowerCase()); }
 
 async function loadAdmins(){
   const ref = doc(db, "settings", "admins");
@@ -65,9 +65,6 @@ async function loadAdmins(){
   adminUsers = Array.isArray(data.users) ? data.users : [];
   for(const email of builtInAdmins){
     if(!adminEmails.includes(email)) adminEmails.push(email);
-  }
-  if(currentUser && builtInAdmins.includes(currentUser.email)){
-    await setDoc(ref, {emails: adminEmails, updatedAt: serverTimestamp()}, {merge:true});
   }
   renderAdmins();
 }
@@ -2023,10 +2020,64 @@ function bindClick(id, handler){
   if(el) el.addEventListener("click", handler);
 }
 
+function loginStatus(message){ setText("loginStatus",message); }
+function showLogin(){
+  $("loginView")?.classList.remove("hidden");
+  $("appView")?.classList.add("hidden");
+}
+function withLoginTimeout(operation){
+  let timer;
+  return Promise.race([operation,new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(Object.assign(new Error("登入檢查逾時，請按登入重新檢查。"),{code:"login/timeout"})),20000);
+  })]).finally(()=>clearTimeout(timer));
+}
+let loginAttempt=0;
+async function openAdmin(user){
+  const attempt=++loginAttempt;
+  showLogin();
+  if(unsubscribe){unsubscribe();unsubscribe=null;}
+  activities=[];
+  if(!user){currentUser=null;loginStatus("請使用授權 Google 帳號登入後台。");return;}
+  currentUser=user;
+  let stage="讀取活動後台授權";
+  const isCurrent=()=>attempt===loginAttempt && auth.currentUser?.uid===user.uid;
+  loginStatus("正在檢查活動後台權限…");
+  try{
+    await withLoginTimeout(loadAdmins());
+    if(!isCurrent())return;
+    if(!isAdmin(user.email)){
+      loginStatus("此帳號尚未取得活動後台權限。請管理員在行政平台確認帳號已啟用、勾選活動系統，再按「同步活動權限」。完成後按登入重新檢查；也可切換帳號。");
+      return;
+    }
+    stage="讀取活動標籤";
+    await withLoginTimeout(loadTags());
+    if(!isCurrent())return;
+    stage="讀取認證設定";
+    await withLoginTimeout(loadCertificationSettings());
+    if(!isCurrent())return;
+    $("loginView")?.classList.add("hidden");
+    $("appView")?.classList.remove("hidden");
+    setText("userInfo",user.email);
+    resetForm();listenActivities();
+  }catch(err){
+    if(!isCurrent())return;
+    console.error("Activity admin login failed",stage,err);
+    showLogin();
+    const code=String(err.code||"unknown");
+    loginStatus(`${stage}失敗（${code}）。${code.includes("permission-denied")?"請管理員重新同步活動權限；若已同步仍失敗，請提供此訊息以檢查活動系統規則。":"請按登入重試，或切換帳號。"}`);
+  }
+}
 bindClick("loginBtn", async (e) => {
   e.preventDefault();
-  try { await auth.authStateReady(); if(!auth.currentUser) await signInWithPopup(auth, provider); }
-  catch(err){ console.error(err); alert("登入失敗：" + err.message); }
+  // Already signed in does not mean the backend has finished loading. Always retry it.
+  if(auth.currentUser){await openAdmin(auth.currentUser);return;}
+  loginStatus("正在開啟 Google 登入視窗…");
+  try { await signInWithPopup(auth, provider); }
+  catch(err){ console.error(err); loginStatus("Google 登入失敗（"+String(err.code||"unknown")+"）。請允許登入彈出視窗後重試，或切換帳號。"); }
+});
+bindClick("switchAccountBtn", async () => {
+  try{await signOut(auth);provider.setCustomParameters({prompt:"select_account"});loginStatus("已登出，請按登入選擇正確帳號。");}
+  catch(err){loginStatus("登出失敗（"+String(err.code||"unknown")+"），請重新整理後再試。");}
 });
 
 bindClick("logoutBtn", () => signOut(auth));
@@ -2182,26 +2233,8 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape") closeModal();
 });
 
-onAuthStateChanged(auth, async user => {
-  if(!user){
-    $("loginView")?.classList.remove("hidden");
-    $("appView")?.classList.add("hidden");
-    return;
-  }
-  currentUser = user;
-  await loadAdmins();
-  await loadTags();
-  await loadCertificationSettings();
-  if(!isAdmin(user.email)){
-    alert("這個帳號沒有後台權限：" + user.email);
-    await signOut(auth);
-    return;
-  }
-  $("loginView")?.classList.add("hidden");
-  $("appView")?.classList.remove("hidden");
-  setText("userInfo", user.email);
-  resetForm();
-  listenActivities();
+onAuthStateChanged(auth, user => { void openAdmin(user); }, err => {
+  showLogin();loginStatus("登入狀態讀取失敗（"+String(err.code||"unknown")+"），請重新整理後再試。");
 });
 
 ["dashboardSearch"].forEach(id=>$(id)?.addEventListener("input",renderDashboardList));
